@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBridge · Plan</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ ASSET_V }}">
+  <script src="/static/app.js?v={{ ASSET_V }}"></script>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="mark"></span> StudyBridge</div>
+    <div class="nav">
+      <a href="/dashboard">Prepare</a>
+      <a href="/plan" class="active">Plan</a>
+      <a href="/study">Study</a>
+      <span class="who">{{ user.name }}</span>
+      <a href="/logout">Sign out</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="plan-head">
+      <div>
+        <div class="page-title">Study plan</div>
+        <p class="page-sub" id="sub">A day-by-day schedule built around your exam dates. Color = subject.</p>
+      </div>
+      <div class="view-toggle no-print">
+        <button id="tab-cal" class="vt-btn active" onclick="setView('cal')">Calendar</button>
+        <button id="tab-tbl" class="vt-btn" onclick="setView('tbl')">Table</button>
+      </div>
+    </div>
+    <div id="legend" class="legend"></div>
+    <div id="plan-host"></div>
+  </div>
+
+<script>
+let ITEMS = [];
+let VIEW = "cal";
+const SUBJ_COLORS = ["#4338ca","#0e7c66","#b4530a","#9b2c6f","#1f6f9c","#7a5b15","#5b3aa6","#176b3a"];
+let COLORMAP = {};
+
+async function load() {
+  const r = await apiGet("/api/plan");
+  ITEMS = r.items || [];
+  if (r.generated_at) document.getElementById("sub").textContent =
+    `Generated on ${r.generated_at}. Color = subject. Switch to Table to edit.`;
+  const subs = [...new Set(ITEMS.map(i=>i.subject).filter(Boolean))];
+  COLORMAP = {}; subs.forEach((s,i)=>COLORMAP[s]=SUBJ_COLORS[i%SUBJ_COLORS.length]);
+  renderLegend(subs);
+  render();
+}
+function colorFor(s){ return COLORMAP[s] || "#6b7280"; }
+
+function renderLegend(subs){
+  const el=document.getElementById("legend");
+  if(!subs.length){ el.innerHTML=""; return; }
+  el.innerHTML = subs.map(s=>`<span class="leg"><span class="leg-dot" style="background:${colorFor(s)}"></span>${esc(s)}</span>`).join("");
+}
+
+function setView(v){
+  VIEW=v;
+  document.getElementById("tab-cal").classList.toggle("active", v==="cal");
+  document.getElementById("tab-tbl").classList.toggle("active", v==="tbl");
+  document.getElementById("legend").style.display = v==="cal" ? "flex" : "none";
+  render();
+}
+
+function render(){
+  const host=document.getElementById("plan-host");
+  if(!ITEMS.length){
+    host.innerHTML=`<div class="empty-state"><div class="big">No plan yet.</div>
+      Go to Prepare and press “Start — make my study sheets” to create your plan.</div>`;
+    return;
+  }
+  host.innerHTML = VIEW==="cal" ? renderCalendar() : renderTable();
+}
+
+/* ---------------- calendar ---------------- */
+function renderCalendar(){
+  const byDay={};
+  ITEMS.forEach(it=>{ if(it.day){ (byDay[it.day]=byDay[it.day]||[]).push(it); } });
+  const days=Object.keys(byDay).sort();
+  if(!days.length) return renderTable();
+  const first=new Date(days[0]+"T00:00:00"), last=new Date(days[days.length-1]+"T00:00:00");
+  let html="";
+  let y=first.getFullYear(), m=first.getMonth();
+  const endTag=last.getFullYear()*12+last.getMonth();
+  while(y*12+m <= endTag){
+    html += renderMonth(y, m, byDay);
+    m++; if(m>11){ m=0; y++; }
+  }
+  return `<div class="cal-wrap">${html}</div>`;
+}
+function renderMonth(y, m, byDay){
+  const monthName=new Date(y,m,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const firstDow=new Date(y,m,1).getDay();
+  const daysIn=new Date(y,m+1,0).getDate();
+  const dow=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="cal-dow">${d}</div>`).join("");
+  let cells="";
+  for(let i=0;i<firstDow;i++) cells+=`<div class="cal-cell empty"></div>`;
+  for(let d=1; d<=daysIn; d++){
+    const iso=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const items=byDay[iso]||[];
+    const chips=items.map(it=>{
+      const c=colorFor(it.subject);
+      const open=it.chapter_id?`onclick="location.href='/study?chapter=${it.chapter_id}'"`:"";
+      return `<div class="cal-chip ${it.done?'done':''}" style="--c:${c}" ${open} title="${esc(it.subject)} — ${esc(it.task||'')}">
+        <span class="cal-chip-sub">${esc(it.subject)}</span>
+        <span class="cal-chip-ch">${esc(it.chapter||'')}</span></div>`;
+    }).join("");
+    cells+=`<div class="cal-cell"><div class="cal-num">${d}</div>${chips}</div>`;
+  }
+  return `<div class="cal-month"><div class="cal-title">${monthName}</div>
+    <div class="cal-grid">${dow}${cells}</div></div>`;
+}
+
+/* ---------------- table (editable) ---------------- */
+function renderTable(){
+  let rows="", lastDay=null;
+  for(const it of ITEMS){
+    if(it.day!==lastDay){ rows+=`<tr class="day-divider"><td colspan="5">${esc(it.day||"No date")}</td></tr>`; lastDay=it.day; }
+    const c=colorFor(it.subject);
+    rows+=`<tr class="${it.done?"done":""}" data-id="${it.id}">
+      <td style="width:34px;text-align:center"><input type="checkbox" ${it.done?"checked":""} onchange="toggle(${it.id},this.checked)"></td>
+      <td style="width:140px"><span class="tbl-dot" style="background:${c}"></span><input type="text" value="${esc(it.subject)}" onchange="edit(${it.id})" data-f="subject" style="width:calc(100% - 16px)"></td>
+      <td style="width:170px"><input type="text" value="${esc(it.chapter)}" onchange="edit(${it.id})" data-f="chapter"></td>
+      <td><input type="text" value="${esc(it.task)}" onchange="edit(${it.id})" data-f="task"></td>
+      <td style="width:96px;white-space:nowrap">
+        ${it.chapter_id?`<a class="btn-ghost btn-sm" style="text-decoration:none" href="/study?chapter=${it.chapter_id}">Open</a>`:""}
+        <button class="btn-danger btn-sm" onclick="del(${it.id})">&times;</button>
+      </td></tr>`;
+  }
+  return `<table class="plan-table">
+    <thead><tr><th></th><th>Subject</th><th>Chapter</th><th>Task</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <button class="btn-ghost btn-sm" style="margin-top:14px" onclick="addRow()">+ Add row</button>`;
+}
+
+function rowData(id){
+  const tr=document.querySelector(`tr[data-id="${id}"]`);
+  const get=f=>tr.querySelector(`[data-f="${f}"]`).value;
+  const day=(()=>{ let el=tr.previousElementSibling; while(el&&!el.classList.contains("day-divider")) el=el.previousElementSibling; return el?el.textContent.trim():""; })();
+  return { id, day, subject:get("subject"), chapter:get("chapter"), task:get("task"),
+           done: tr.querySelector('input[type="checkbox"]').checked };
+}
+async function edit(id){ await apiPostJson("/api/plan/item", rowData(id)); toast("Saved"); }
+async function toggle(id,val){ const d=rowData(id); d.done=val; await apiPostJson("/api/plan/item",d);
+  const it=ITEMS.find(i=>i.id===id); if(it) it.done=val;
+  const tr=document.querySelector(`tr[data-id="${id}"]`); if(tr) tr.classList.toggle("done",val); }
+async function del(id){ await apiPostJson("/api/plan/item",{id,delete:true}); ITEMS=ITEMS.filter(i=>i.id!==id); render(); }
+async function addRow(){ const day=ITEMS.length?ITEMS[ITEMS.length-1].day:new Date().toISOString().slice(0,10);
+  await apiPostJson("/api/plan/item",{day,subject:"",chapter:"",task:"New task"}); load(); }
+
+load();
+</script>
+</body>
+</html>

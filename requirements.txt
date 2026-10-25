@@ -1,0 +1,14 @@
+PyMuPDF
+pymupdf-fonts
+fastapi
+jinja2
+markdown
+odfpy
+openai
+openpyxl
+pytesseract
+python-docx
+python-multipart
+python-pptx
+striprtf
+uvicorn[standard]

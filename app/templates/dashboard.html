@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBridge · Prepare</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ ASSET_V }}">
+  <script src="/static/app.js?v={{ ASSET_V }}"></script>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="mark"></span> StudyBridge</div>
+    <div class="nav">
+      <a href="/dashboard" class="active">Prepare</a>
+      <a href="/plan">Plan</a>
+      <a href="/study">Study</a>
+      
+      
+      <span class="who">{{ user.name }}</span>
+      <a href="/logout">Sign out</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <section class="hero fade-up">
+      <div class="hero-text">
+        <div class="eyebrow">Set up your exams</div>
+        <h1>Turn your class files into a <span class="hl">study plan</span>.</h1>
+        <p class="lead">Add your subjects, drop in your class files — even phone photos of your notes — and get a study sheet for every chapter plus a day-by-day plan. Just follow the steps below.</p>
+      </div>
+      <aside class="readiness card">
+        <div class="r-title">Your progress</div>
+        <ol class="stepper">
+          <li class="pier" id="pier1"><span class="dot">1</span><div><b>Subjects</b><span class="stat" id="stat1">—</span></div></li>
+          <li class="pier" id="pier2"><span class="dot">2</span><div><b>Materials</b><span class="stat" id="stat2">—</span></div></li>
+          <li class="pier" id="pier3"><span class="dot">3</span><div><b>Generate</b><span class="stat" id="stat3">—</span></div></li>
+        </ol>
+      </aside>
+    </section>
+
+    <!-- STEP 1 -->
+    <section class="step">
+      <div class="step-head"><span class="n">1</span><div><h2>Subjects</h2>
+        <p>Add the subjects you're studying for.</p></div></div>
+
+      <!-- A: import syllabus files (primary) -->
+      <div class="opt-card primary">
+        <div class="opt-head">
+          <div class="opt-badge">A</div>
+          <div>
+            <div class="opt-title">Import syllabus files</div>
+            <div class="opt-sub">A .zip, several files, or a folder. We read them and show you the subjects before creating anything. (Class notes/photos go in Step 2, not here.)</div>
+          </div>
+        </div>
+        <div class="opt-actions">
+          <label class="btn-primary btn-sm" style="cursor:pointer;margin:0;white-space:nowrap">Select files / .zip
+            <input type="file" id="syl-import" multiple style="display:none" onchange="importSyllabi(this)"></label>
+          <label class="btn-line btn-sm" style="cursor:pointer;margin:0;white-space:nowrap">Select a folder
+            <input type="file" id="syl-import-dir" webkitdirectory directory multiple style="display:none" onchange="importSyllabi(this)"></label>
+        </div>
+        <div class="opt-tip">Hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd> to pick several at once.</div>
+        <div id="syl-import-msg" class="opt-body"></div>
+      </div>
+
+      <!-- B: add one by hand (collapsed by default) -->
+      <details class="opt-card alt manual-details">
+        <summary class="opt-head">
+          <div class="opt-badge">B</div>
+          <div style="flex:1">
+            <div class="opt-title">Add one by hand</div>
+            <div class="opt-sub">Type a subject and its chapters yourself.</div>
+          </div>
+          <span class="md-chev">▶</span>
+        </summary>
+        <div class="opt-body">
+          <div class="field"><label>Subject name</label><input type="text" id="s-name" placeholder="e.g. AP Chemistry"></div>
+          <div class="group">
+            <div class="group-head">
+              <span class="g-title">Chapters — one per line</span>
+              <div style="display:flex;gap:8px">
+                <button class="btn-ghost btn-sm" onclick="aiSyllabus()" id="ai-syl-btn">Generate with AI</button>
+                <label class="btn-line btn-sm" style="margin:0;cursor:pointer">Upload file
+                  <input type="file" id="s-syl-file" style="display:none" onchange="uploadSyllabus()"></label>
+              </div>
+            </div>
+            <textarea id="s-syl" placeholder="One chapter per line, e.g.&#10;Atomic Structure&#10;Chemical Bonding&#10;Stoichiometry"></textarea>
+            <div id="syl-msg"></div>
+          </div>
+          <div class="group">
+            <div class="group-head"><span class="g-title">Exam date &amp; scope</span></div>
+            <div class="field"><label>Exam date</label><input type="date" id="s-date" lang="en"></div>
+            <div class="field" style="margin-bottom:0">
+              <label>Exam scope</label>
+              <label class="check"><input type="checkbox" id="s-all" checked onchange="toggleAll(this,'s-scope')"> Whole syllabus (ALL)</label>
+              <input type="text" id="s-scope" placeholder="e.g. Units 1–5" disabled>
+            </div>
+          </div>
+          <button class="btn-primary" style="margin-top:18px" onclick="addSubject()">Add subject</button>
+        </div>
+      </details>
+
+      <!-- subjects appear below the inputs -->
+      <div class="subjects-divider"><span>Your subjects</span></div>
+      <div class="subject-list" id="subjects"></div>
+      <div id="subjects-empty" class="empty-box">
+        <div class="empty-emoji">📚</div>
+        <div class="empty-title">No subjects yet</div>
+        <div class="empty-text">Use <b>A</b> above to import your syllabus, or <b>B</b> to add one by hand. Your subjects will show up here.</div>
+      </div>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="step">
+      <div class="step-head"><span class="n">2</span><div><h2>Add your class files</h2>
+        <p>Photos, PDFs, slides — add them all. We file each one under the right chapter.</p></div></div>
+      <div id="step2-needs" class="callout" style="display:none;margin-bottom:12px">First add a subject in Step 1 above. Then come back here and add your files.</div>
+      <div class="card">
+        <label class="dropzone" for="files">
+          <div class="dz-ic">↑</div>
+          <div class="dz-main" id="dz-main">Tap to choose your files</div>
+          <div class="dz-sub">Phone photos, PDF, Word, PowerPoint, Excel, text — or a whole <b>.zip</b>. Don't worry about which subject; it's sorted for you. (Google Docs/Sheets: download them first.)</div>
+          <input type="file" id="files" multiple style="display:none" onchange="onFilesPicked()">
+        </label>
+        <div style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <button class="btn-primary btn-sm" onclick="uploadFiles()">Add these files</button>
+          <label class="btn-line btn-sm" style="cursor:pointer;margin:0">Or choose a folder
+            <input type="file" id="files-dir" webkitdirectory directory multiple style="display:none" onchange="onFolderPicked()"></label>
+          <span class="hint" id="dz-count"></span>
+        </div>
+        <div id="upload-results" style="margin-top:12px"></div>
+        <div id="unsorted-card" style="display:none;margin-top:14px"></div>
+      </div>
+    </section>
+
+    <!-- STEP 3 -->
+    <section class="step">
+      <div class="step-head"><span class="n">3</span><div><h2>Make my study sheets</h2>
+        <p>StudyBridge turns your chapters into study sheets and a day-by-day plan.</p></div></div>
+      <div class="card">
+        <div id="gen-area"><p class="hint">Loading…</p></div>
+      </div>
+    </section>
+
+    <!-- STEP 4: backup -->
+    <section class="step">
+      <div class="step-head"><span class="n" style="background:var(--green)">4</span><div><h2>Save your work <span style="font-weight:500;color:var(--muted);font-size:15px">(optional)</span></h2>
+        <p>Download a backup file, or restore one after an update.</p></div></div>
+      <div class="card">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn-ghost btn-sm" onclick="location.href='/api/db/export'">Download backup</button>
+          <label class="btn-line btn-sm" style="cursor:pointer;margin:0">Restore from a file
+            <input type="file" id="db-file" accept=".json" style="display:none" onchange="importDB()"></label>
+          <span class="hint" id="db-msg"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+let SUBJECTS = [];
+
+function toggleAll(cb, textId){ const el=document.getElementById(textId); el.disabled = cb.checked; if(cb.checked) el.value=""; }
+
+function daysLeft(d){ if(!d) return null;
+  return Math.round((new Date(d+"T00:00:00") - new Date(new Date().toDateString()))/86400000); }
+function examDatePicker(i, val){
+  const shown = val ? fmtExamDate(val) : "Set exam date";
+  // Visible button shows English text; hidden native input provides the calendar popup.
+  return `<button type="button" class="edp-btn" onclick="openExamCal(this)">📅 <span class="edp-text">${shown}</span></button>
+    <input type="date" class="edp-native" value="${esc(val||"")}" onchange="onExamDatePick(${i}, this)">`;
+}
+function openExamCal(btn){
+  const input=btn.parentNode.querySelector("input.edp-native");
+  if(input.showPicker) input.showPicker(); else { input.style.position="static"; input.focus(); input.click(); }
+}
+function onExamDatePick(i, input){
+  PREVIEW[i].exam_date = input.value || "";
+  const txt = input.parentNode.querySelector(".edp-text");
+  if(txt) txt.textContent = input.value ? fmtExamDate(input.value) : "Set exam date";
+}
+function fmtExamDate(d){
+  // Always render in English regardless of browser locale: "Jul 10, 2026"
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||""); if(!m) return d||"";
+  const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${months[+m[2]-1]} ${+m[3]}, ${m[1]}`;
+}
+function dateChip(d){
+  if(!d) return `<span class="chip">No exam date</span>`;
+  const n=daysLeft(d); const cls=n<=7?"urgent":(n<=21?"soon":""); 
+  const txt=n<0?"passed":(n===0?"today":"in "+n+" days");
+  return `<span class="chip date ${cls}">${fmtExamDate(d)} · ${txt}</span>`;
+}
+function scopeChip(scope){
+  if(!scope) return "";
+  return scope==="ALL" ? `<span class="chip">Scope: All chapters</span>` : `<span class="chip">Scope: ${esc(scope)}</span>`;
+}
+
+async function loadSubjects(){ SUBJECTS=(await apiGet("/api/subjects")).subjects; renderSubjects(); updateRail(); loadUnsorted(); openGenerate(); }
+
+function renderSubjects(){
+  const host=document.getElementById("subjects");
+  const empty=document.getElementById("subjects-empty");
+  const needs=document.getElementById("step2-needs");
+  if(empty) empty.style.display = SUBJECTS.length ? "none" : "block";
+  if(needs) needs.style.display = SUBJECTS.length ? "none" : "block";
+  if(!SUBJECTS.length){ host.innerHTML=""; return; }
+  host.innerHTML=SUBJECTS.map(s=>{
+    const filled=s.chapters.filter(c=>c.has_material).length;
+    const totalFiles=s.chapters.reduce((n,c)=>n+(c.materials?c.materials.length:0),0);
+    const emptyCh=s.chapters.filter(c=>!c.has_material);
+    const count = s.chapters.length
+      ? `${s.chapters.length} ch · ${totalFiles} file${totalFiles!==1?"s":""} · ${filled}/${s.chapters.length} filled`
+      : "no chapters yet";
+    const planks = s.chapters.length
+      ? `<div class="bridge"><div class="bridge-label"><span>Chapters · tap one to see its files</span><span>${filled}/${s.chapters.length} filled</span></div>
+           <div class="planks">${s.chapters.map(c=>`<button type="button" class="plank ${c.has_material?"filled":"empty"}" onclick="toggleChapterFiles(${s.id},${c.id},event)">${esc(c.name)}${c.has_material?`<b class="pk-n">${c.materials.length}</b>`:""}</button>`).join("")}</div>
+           <div class="plank-files" id="pf-${s.id}"></div></div>`
+      : `<div class="callout mark">No chapters yet — open Edit and add a syllabus.</div>`;
+    const isAll=(s.exam_scope||"")==="ALL";
+    return `
+    <details class="subject-card">
+      <summary>
+        <div class="s-summary-main">
+          <span class="s-name">${esc(s.name)}</span>
+          ${dateChip(s.exam_date)}${scopeChip(s.exam_scope)}
+        </div>
+        <span class="s-count">${count}</span>
+        ${s.chapters.length ? (emptyCh.length
+          ? `<span class="miss-badge" title="${emptyCh.length} chapter(s) have no files">⚠️ ${emptyCh.length} missing</span>`
+          : `<span class="ok-badge" title="All chapters have files">✓ complete</span>`) : ""}
+        <span class="chev">▶</span>
+        <button class="x-btn" title="Delete subject" onclick="event.preventDefault();event.stopPropagation();delSubject(${s.id})">&times;</button>
+      </summary>
+      <div class="s-body">
+        ${planks}
+        <div class="edit-wrap">
+          <div class="group-head"><span class="g-title">Syllabus</span>
+            <button class="btn-ghost btn-sm" onclick="regenSyllabus(${s.id})">Regenerate with AI</button></div>
+          <textarea id="syl-${s.id}" style="min-height:84px">${s.chapters.map(c=>c.name).join("\n")}</textarea>
+          <div class="group">
+            <div class="group-head"><span class="g-title">Exam date &amp; scope</span></div>
+            <div class="field"><label>Exam date</label><input type="date" id="e-date-${s.id}" value="${esc(s.exam_date||"")}" lang="en"></div>
+            <div class="field" style="margin-bottom:0">
+              <label>Exam scope</label>
+              <label class="check"><input type="checkbox" id="e-all-${s.id}" ${isAll?"checked":""} onchange="toggleAll(this,'e-scope-${s.id}')"> Whole syllabus (ALL)</label>
+              <input type="text" id="e-scope-${s.id}" value="${isAll?"":esc(s.exam_scope||"")}" placeholder="e.g. Units 1–5" ${isAll?"disabled":""}>
+            </div>
+          </div>
+          <button class="btn-primary btn-sm" style="margin-top:14px" onclick="saveSubject(${s.id})">Save changes</button>
+        </div>
+      </div>
+    </details>`;
+  }).join("");
+}
+
+function toggleChapterFiles(sid,cid,ev){
+  if(ev) ev.preventDefault();
+  const s=SUBJECTS.find(x=>x.id===sid); if(!s) return;
+  const c=s.chapters.find(x=>x.id===cid); if(!c) return;
+  const box=document.getElementById("pf-"+sid); if(!box) return;
+  if(box.dataset.open===String(cid)){ box.innerHTML=""; box.dataset.open=""; return; }
+  box.dataset.open=String(cid);
+  if(!c.materials||!c.materials.length){
+    box.innerHTML=`<div class="pf-head">${esc(c.name)} — no files yet</div>`; return;
+  }
+  box.innerHTML=`<div class="pf-head">${esc(c.name)} · ${c.materials.length} file(s)</div>
+    <div class="pf-list">${c.materials.map(m=>`<span class="file-chip">${esc(m.filename)}</span>`).join("")}</div>`;
+}
+
+async function loadUnsorted(){
+  const box=document.getElementById("unsorted-card"); if(!box) return;
+  let r; try{ r=await apiGet("/api/unsorted"); }catch(e){ return; }
+  const items=(r&&r.unsorted)||[];
+  if(!items.length){ box.style.display="none"; box.innerHTML=""; return; }
+  const hasChapters=SUBJECTS.some(s=>s.chapters.length);
+  const opts=SUBJECTS.flatMap(s=>s.chapters.map(c=>`<option value="${c.id}">${esc(s.name)} / ${esc(c.name)}</option>`)).join("");
+  const CAP=25;
+  const rows=items.slice(0,CAP).map(m=>`<div class="uns-item">
+      <div class="uns-row" id="uns-${m.id}">
+        <div class="uns-info"><div class="uns-name">${esc(m.filename)}</div>${m.preview?`<div class="uns-prev">${esc(m.preview)}…</div>`:""}</div>
+        <div class="uns-act">
+          <button class="btn-ghost btn-sm" onclick="reviewMaterial(${m.id})">Review</button>
+          ${hasChapters?`<select id="usel-${m.id}" class="uns-sel"><option value="">Move to…</option>${opts}</select>
+          <button class="btn-line btn-sm" onclick="assignMaterial(${m.id})">Place</button>`:""}
+          <button class="x-btn" title="Delete this file" onclick="deleteMaterial(${m.id})">&times;</button>
+        </div>
+      </div>
+      <div class="uns-review" id="rev-${m.id}"></div>
+    </div>`).join("");
+  const more=items.length>CAP?`<div class="hint" style="margin-top:8px">…and ${items.length-CAP} more. Sort automatically first — manual placing is only for leftovers.</div>`:"";
+
+  box.style.display="block";
+  box.innerHTML=`<div class="unsorted-box">
+    <div class="uns-head">
+      <div>
+        <div class="uns-title">${items.length} file(s) not in a chapter yet</div>
+        <div class="hint" style="margin-top:2px">${hasChapters
+          ? "<b>Sort automatically</b> puts files into matching chapters. Anything that stays here didn’t match any chapter — it’s usually not a class file (a flyer, schedule, etc.). <b>Review</b> to check, then <b>Place</b> it or delete it with ✕."
+          : "Add a subject with chapters first (Step 1), then press <b>Sort automatically</b>."}</div>
+      </div>
+      ${hasChapters?`<button class="btn-primary btn-sm" style="white-space:nowrap" onclick="resortUnsorted(this)">Sort automatically</button>`:""}
+    </div>
+    <details class="uns-details" ${items.length<=6?"open":""}>
+      <summary>Show the ${items.length} file(s)</summary>
+      <div class="uns-list">${rows}${more}</div>
+    </details>
+  </div>`;
+}
+async function resortUnsorted(btn){
+  if(btn){ btn.disabled=true; btn.textContent="Sorting…"; }
+  const r=await apiPostForm("/api/resort", new FormData());
+  if(r.error){ toast(r.error); if(btn){btn.disabled=false;btn.textContent="Sort automatically";} return; }
+  toast(`Sorted ${r.sorted} file(s).` + (r.unsorted?` ${r.unsorted} left over.`:""));
+  await loadSubjects();   // refreshes chapter counts + the unsorted box
+}
+async function assignMaterial(mid){
+  const sel=document.getElementById("usel-"+mid); const cid=sel?sel.value:"";
+  if(!cid){ toast("Pick a chapter first."); return; }
+  const fd=new FormData(); fd.append("material_id",mid); fd.append("chapter_id",cid);
+  const r=await apiPostForm("/api/material/assign",fd);
+  if(r.error){ toast(r.error); return; }
+  toast("Placed in chapter."); await loadSubjects();
+}
+async function deleteMaterial(mid){
+  if(!confirm("Delete this file?")) return;
+  await fetch("/api/material/"+mid,{method:"DELETE"});
+  toast("Deleted."); loadUnsorted();
+}
+async function reviewMaterial(mid){
+  const panel=document.getElementById("rev-"+mid); if(!panel) return;
+  if(panel.dataset.open){ panel.innerHTML=""; panel.dataset.open=""; return; }
+  panel.dataset.open="1";
+  panel.innerHTML='<div class="rev-box"><div class="hint"><span class="spinner" style="color:var(--indigo)"></span> Reading the file…</div></div>';
+  let r; try{ r=await apiGet("/api/material/"+mid+"/review"); }catch(e){ panel.innerHTML='<div class="rev-box"><div class="callout error">Could not read this file.</div></div>'; return; }
+  if(r.error){ panel.innerHTML=`<div class="rev-box"><div class="callout error">${esc(r.error)}</div></div>`; return; }
+  const sug=(r.suggestions||[]).map(s=>`<button class="btn-mark btn-sm" onclick="assignTo(${mid},${s.chapter_id})">${esc(s.label)}</button>`).join(" ");
+  const body=r.text?esc(r.text)+(r.truncated?" …":""):"(No readable text was found in this file.)";
+  panel.innerHTML=`<div class="rev-box">
+    ${r.is_image?'<div class="rev-tag">📷 Photo — text read by OCR</div>':''}
+    ${sug?`<div class="rev-sug"><span class="rev-lbl">Send to:</span> ${sug}</div>`:'<div class="hint">No chapter suggestion — pick one with “Move to…”.</div>'}
+    <div class="rev-text">${body}</div>
+  </div>`;
+}
+async function assignTo(mid,cid){
+  const fd=new FormData(); fd.append("material_id",mid); fd.append("chapter_id",cid);
+  const r=await apiPostForm("/api/material/assign",fd);
+  if(r.error){ toast(r.error); return; }
+  toast("Placed in chapter."); await loadSubjects();
+}
+
+function updateRail(){
+  const subjCt=SUBJECTS.length;
+  const chs=SUBJECTS.reduce((a,s)=>a+s.chapters.length,0);
+  const filled=SUBJECTS.reduce((a,s)=>a+s.chapters.filter(c=>c.has_material).length,0);
+  document.getElementById("stat1").textContent=subjCt?subjCt+" subject"+(subjCt>1?"s":"")+" added":"Add your subjects";
+  document.getElementById("stat2").textContent=chs?(filled?filled+" of "+chs+" chapters have files":"Add your files"):"—";
+  document.getElementById("pier1").classList.toggle("done",chs>0);
+  document.getElementById("pier2").classList.toggle("done",filled>0);
+  apiGet("/api/study-data").then(d=>{
+    const gen=d.subjects.reduce((a,s)=>a+s.chapters.length,0);
+    document.getElementById("stat3").textContent=gen?gen+" sheets ready":"Not made yet";
+    document.getElementById("pier3").classList.toggle("done",gen>0);
+  });
+}
+
+async function addSubject(){
+  const name=document.getElementById("s-name").value.trim();
+  if(!name){ toast("Enter a subject name."); return; }
+  const scope=document.getElementById("s-all").checked ? "ALL" : document.getElementById("s-scope").value.trim();
+  const fd=new FormData();
+  fd.append("name",name);
+  fd.append("exam_date",document.getElementById("s-date").value);
+  fd.append("exam_scope",scope);
+  const sid=(await apiPostForm("/api/subject",fd)).subject_id;
+  const syl=document.getElementById("s-syl").value.trim();
+  if(syl){ const f2=new FormData(); f2.append("subject_id",sid); f2.append("mode","user"); f2.append("chapters_text",syl); await apiPostForm("/api/syllabus",f2); }
+  ["s-name","s-date","s-scope","s-syl"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("syl-msg").innerHTML="";
+  document.getElementById("s-all").checked=true; toggleAll(document.getElementById("s-all"),"s-scope");
+  toast("Subject added."); loadSubjects();
+}
+
+function sylMsg(html){ document.getElementById("syl-msg").innerHTML = html; }
+
+async function aiSyllabus(){
+  const name=document.getElementById("s-name").value.trim();
+  if(!name){ toast("Enter the subject name first."); return; }
+  const scope=document.getElementById("s-all").checked ? "ALL" : document.getElementById("s-scope").value.trim();
+  const btn=document.getElementById("ai-syl-btn"); const old=btn.textContent;
+  btn.innerHTML='<span class="spinner"></span> Generating'; sylMsg("");
+  const fd=new FormData(); fd.append("name",name); fd.append("exam_scope",scope);
+  const r=await apiPostForm("/api/syllabus/preview",fd);
+  if(r.chapters){ document.getElementById("s-syl").value=r.chapters.join("\n"); toast("Generated — review and edit, then Add."); }
+  else sylMsg(`<div class="callout error" style="margin-top:10px">${esc(r.error||"AI could not generate. Check the logs folder.")}</div>`);
+  btn.textContent=old;
+}
+
+async function uploadSyllabus(){
+  const input=document.getElementById("s-syl-file");
+  if(!input.files.length) return;
+  const name=document.getElementById("s-name").value.trim();
+  sylMsg('<div class="hint" style="margin-top:10px"><span class="spinner" style="color:var(--indigo)"></span> Reading the syllabus file…</div>');
+  const fd=new FormData(); fd.append("name",name); fd.append("file",input.files[0]);
+  const r=await apiPostForm("/api/syllabus/from-file",fd);
+  input.value="";
+  if(r.chapters){
+    document.getElementById("s-syl").value=r.chapters.join("\n");
+    const nameEl=document.getElementById("s-name");
+    let msg="Chapters extracted — review and edit, then Add.";
+    if(r.subject && !nameEl.value.trim()){ nameEl.value=r.subject; msg=`Detected subject “${r.subject}” and its chapters — review, then Add.`; }
+    sylMsg(""); toast(msg);
+  }
+  else sylMsg(`<div class="callout error" style="margin-top:10px">${esc(r.error||"Could not read that file.")}</div>`);
+}
+
+async function saveSubject(id){
+  const s=SUBJECTS.find(x=>x.id===id);
+  const scope=document.getElementById("e-all-"+id).checked ? "ALL" : document.getElementById("e-scope-"+id).value.trim();
+  const fd=new FormData();
+  fd.append("subject_id",id); fd.append("name",s.name);
+  fd.append("exam_date",document.getElementById("e-date-"+id).value);
+  fd.append("exam_scope",scope);
+  await apiPostForm("/api/subject",fd);
+  const f2=new FormData(); f2.append("subject_id",id); f2.append("mode","user"); f2.append("chapters_text",document.getElementById("syl-"+id).value);
+  await apiPostForm("/api/syllabus",f2);
+  toast("Saved."); loadSubjects();
+}
+async function regenSyllabus(id){
+  const fd=new FormData(); fd.append("subject_id",id); fd.append("mode","ai"); fd.append("chapters_text","");
+  toast("AI is rebuilding the chapter list...");
+  const r=await apiPostForm("/api/syllabus",fd);
+  if(r.error){ toast(r.error); return; }
+  toast("Chapters rebuilt."); loadSubjects();
+}
+async function delSubject(id){ if(!confirm("Delete this subject and its chapters?")) return;
+  await fetch("/api/subject/"+id,{method:"DELETE"}); loadSubjects(); }
+
+function onFilesPicked(){
+  const n=document.getElementById("files").files.length;
+  document.getElementById("dz-main").textContent=n?n+" file"+(n>1?"s":"")+" ready to add":"Tap to choose your files";
+  document.getElementById("dz-count").textContent=n?"Now press “Add these files”.":"";
+}
+function onFolderPicked(){
+  const dir=document.getElementById("files-dir");
+  if(dir.files.length){ doUpload(dir.files); dir.value=""; }
+}
+async function uploadFiles(){
+  const input=document.getElementById("files");
+  if(!input.files.length){ toast("Choose files first."); return; }
+  await doUpload(input.files);
+  input.value=""; onFilesPicked();
+}
+async function doUpload(fileList){
+  const fd=new FormData(); for(const f of fileList) fd.append("files",f);
+  const host=document.getElementById("upload-results");
+  host.insertAdjacentHTML("afterbegin",
+    `<div class="up-loading gen-prog" id="up-loading">
+       <div class="gen-prog-top"><span id="up-pct">0%</span><span id="up-eta" class="hint"></span></div>
+       <div class="gen-bridge"><i id="up-prog" style="width:0%"></i></div>
+       <div class="progress-text" id="up-msg" style="margin-top:8px">Uploading ${fileList.length} file(s)…</div>
+       <div class="hint" id="up-sub" style="margin-top:2px"></div>
+     </div>`);
+  const setMsg=(t)=>{const e=document.getElementById("up-msg"); if(e) e.textContent=t;};
+  const setBar=(p)=>{const e=document.getElementById("up-prog"); if(e) e.style.width=Math.round(p)+"%";
+                     const pe=document.getElementById("up-pct"); if(pe) pe.textContent=Math.round(p)+"%";};
+  const setEta=(t)=>{const e=document.getElementById("up-eta"); if(e) e.textContent=t;};
+  const setSub=(t)=>{const e=document.getElementById("up-sub"); if(e) e.textContent=t;};
+  const fmtEta=(s)=>{ if(!s||s<=0) return ""; return s<60?("~"+s+"s left"):("~"+Math.round(s/60)+" min left"); };
+
+  // ---- (C) transfer progress, then (A) processing progress via polling ----
+  let polling=true;
+  async function poll(){
+    while(polling){
+      try{
+        const p=await (await fetch("/api/upload/progress")).json();
+        if(p.state==="preparing"){
+          setMsg(`Preparing files… ${p.done}/${p.total}`);
+          if(p.total) setBar(100*p.done/p.total);
+          setEta(""); setSub(p.now||"");
+        }else if(p.state==="processing"){
+          setMsg(`Step 1/2 · Reading files — ${p.done}/${p.total}`);
+          if(p.total) setBar(100*p.done/p.total);
+          setEta(fmtEta(p.eta_sec));
+          setSub(p.now?("Reading: "+p.now):"");
+        }else if(p.state==="matching"){
+          setMsg("Step 2/2 · Sorting files into chapters…"); setBar(100); setEta("");
+          setSub("");
+        }
+      }catch(e){}
+      await new Promise(r=>setTimeout(r,800));
+    }
+  }
+
+  const r=await new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    xhr.open("POST","/api/upload");
+    xhr.upload.onprogress=(e)=>{ if(e.lengthComputable){ const pct=100*e.loaded/e.total;
+        setMsg(`Uploading… ${Math.round(pct)}%`); setBar(pct);
+        if(pct>=100){ setMsg("Upload complete. Starting to read files…"); poll(); } } };
+    xhr.onload=()=>{ polling=false; try{ resolve(JSON.parse(xhr.responseText)); }catch(e){ reject(e); } };
+    xhr.onerror=()=>{ polling=false; reject(new Error("upload failed")); };
+    xhr.send(fd);
+  }).catch(err=>{ return {added:0, failed:[{file:"(upload)",reason:String(err.message||err)}]}; });
+
+  const ld=document.getElementById("up-loading"); if(ld) ld.remove();
+  const bySub={}; let skipped=0;
+  (r.matched||[]).forEach(m=>{ if(m.label){ const sub=m.label.split(" / ")[0]; bySub[sub]=(bySub[sub]||0)+1; } else skipped++; });
+
+  // summary line: added / excluded / warned / failed
+  const s=r.summary||{added:r.added||0,excluded:(r.excluded||[]).length,warned:(r.warned||[]).length,failed:(r.failed||[]).length,duplicate:(r.duplicate||[]).length};
+  let html=`<div class="callout mark"><b>✅ ${s.added} added`+
+           (s.duplicate?` · 🔁 ${s.duplicate} duplicate`:"")+
+           (s.excluded?` · ⏭️ ${s.excluded} excluded`:"")+
+           (s.warned?` · ⚠️ ${s.warned} large`:"")+
+           (s.failed?` · ❌ ${s.failed} failed`:"")+`</b>`;
+  const subs=Object.entries(bySub);
+  if(subs.length){
+    const max=Math.max(...subs.map(([,v])=>v));
+    html+=`<div class="up-bars">`+subs.map(([k,v])=>
+      `<div class="up-bar"><span class="up-name">${esc(k)}</span><span class="up-track"><i style="width:${Math.round(v/max*100)}%"></i></span><b class="up-n">${v}</b></div>`).join("")+`</div>`;
+  }
+  if(skipped) html+=`<div class="hint" style="margin-top:8px">${skipped} file(s) not in a chapter yet — use “Sort automatically” below.</div>`;
+  html+=`</div>`;
+  if(r.match_note) html+=`<div class="hint" style="margin-top:8px">${esc(r.match_note)}</div>`;
+  // duplicate (same content already uploaded)
+  if(r.duplicate&&r.duplicate.length){
+    const items=r.duplicate.slice(0,8).map(f=>`<li>${esc(f.file)}</li>`).join("");
+    const more=r.duplicate.length>8?`<li>…and ${r.duplicate.length-8} more</li>`:"";
+    html+=`<details style="margin-top:8px"><summary class="hint" style="cursor:pointer">🔁 ${r.duplicate.length} duplicate(s) skipped (already uploaded)</summary>
+      <ul style="margin:6px 0 0 18px;font-size:13px;color:var(--muted)">${items}${more}</ul></details>`;
+  }
+  // excluded (video/audio/binary)
+  if(r.excluded&&r.excluded.length){
+    const items=r.excluded.slice(0,8).map(f=>`<li>${esc(f.file)} — ${esc(f.reason)}</li>`).join("");
+    const more=r.excluded.length>8?`<li>…and ${r.excluded.length-8} more</li>`:"";
+    html+=`<details style="margin-top:8px"><summary class="hint" style="cursor:pointer">⏭️ ${r.excluded.length} file(s) excluded (can't be turned into study text)</summary>
+      <ul style="margin:6px 0 0 18px;font-size:13px;color:var(--muted)">${items}${more}</ul></details>`;
+  }
+  // warned (>1GB, still processed)
+  if(r.warned&&r.warned.length){
+    const items=r.warned.slice(0,8).map(f=>`<li>${esc(f.file)} — ${f.size_mb} MB</li>`).join("");
+    html+=`<details style="margin-top:8px"><summary class="hint" style="cursor:pointer">⚠️ ${r.warned.length} large file(s) over 1GB (processed, may be slow)</summary>
+      <ul style="margin:6px 0 0 18px;font-size:13px;color:var(--muted)">${items}</ul></details>`;
+  }
+  if(r.failed&&r.failed.length){
+    const items=r.failed.slice(0,8).map(f=>`<li>${esc(f.file)} — ${esc(f.reason)}</li>`).join("");
+    const more=r.failed.length>8?`<li>…and ${r.failed.length-8} more</li>`:"";
+    html+=`<details style="margin-top:8px"><summary class="hint" style="cursor:pointer">❌ ${r.failed.length} file(s) couldn't be added</summary>
+      <ul style="margin:6px 0 0 18px;font-size:13px;color:var(--muted)">${items}${more}</ul></details>`;
+  }
+  pushUploadBlock(html); toast(`${s.added} file(s) added.`);
+  await loadSubjects(); loadUnsorted();
+}
+// keep this batch's summary and stack newer ones on top of older ones
+function pushUploadBlock(innerHTML){
+  const host=document.getElementById("upload-results");
+  const stamp=new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  host.insertAdjacentHTML("afterbegin",
+    `<div class="up-block"><div class="up-time">Upload · ${stamp}</div>${innerHTML}</div>`);
+}
+
+async function openGenerate(){
+  const host=document.getElementById("gen-area"); if(!host) return;
+  let r; try{ r=await apiPostJson("/api/generate/preview",{}); }catch(e){ return; }
+  const total=r.with_material.length+r.empty.length;
+  if(!total){
+    host.innerHTML='<div class="callout">Add a subject with chapters (Step 1) and some files (Step 2) first. Then you can make your study sheets here.</div>';
+    return;
+  }
+  let html=`<div class="gen-explain">
+    <div class="gen-explain-title">When you press Start, StudyBridge will:</div>
+    <ul class="gen-steps">
+      <li><span>📖</span> Write a full study sheet for every chapter — key concepts, worked examples, must-memorize points, and practice problems with answers.</li>
+      <li><span>🤖</span> Fill in any chapter that has no files using AI, clearly marked <b>AI-written</b>.</li>
+      <li><span>🗓️</span> Build a day-by-day study plan leading up to each exam.</li>
+    </ul>
+  </div>`;
+  html+=`<div class="gen-status"><b>${r.with_material.length}</b> chapter(s) from your files`;
+  if(r.empty.length) html+=` · <b>${r.empty.length}</b> empty chapter(s) AI will write`;
+  html+=`</div>`;
+  if(r.empty.length){
+    html+=`<details class="gen-empty"><summary>${r.empty.length} chapter(s) have no files — AI will write them (uncheck any to skip)</summary>
+      <div class="gen-empty-list">${r.empty.map(e=>`<label class="gen-chk"><input type="checkbox" class="empty-chk" value="${e.chapter_id}" checked> ${esc(e.subject)} / ${esc(e.chapter)}</label>`).join("")}</div></details>`;
+  }
+  html+=`<button class="btn-mark gen-start" onclick="runGenerate()">Start — make my study sheets &amp; plan</button>`;
+  host.innerHTML=html;
+}
+async function runGenerate(){
+  const approved=[...document.querySelectorAll(".empty-chk:checked")].map(c=>parseInt(c.value));
+  const r=await apiPostJson("/api/generate/run",{approved_empty:approved});
+  if(r.error){ toast(r.error); return; }
+  document.getElementById("gen-area").innerHTML=`
+    <div class="gen-prog">
+      <div class="gen-prog-top"><span id="gen-pct">0%</span><span id="gen-eta" class="hint"></span></div>
+      <div class="gen-bridge"><i id="gen-bar"></i></div>
+      <div class="progress-text" id="gen-text" style="margin-top:8px">Starting…</div>
+      <div class="hint" id="gen-now" style="margin-top:2px"></div>
+      <div class="gen-sub" id="gen-sub" style="margin-top:6px;display:none">
+        <div class="gen-bridge gen-bridge-sm"><i id="gen-subbar"></i></div>
+        <div class="hint" id="gen-subtext" style="margin-top:3px"></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn-line btn-sm" id="gen-stop" onclick="stopGenerate(this)">Stop</button>
+        <span class="hint" style="margin-left:8px">Finished chapters are saved — you can Start again later to resume.</span>
+      </div>
+    </div>`;
+  pollProgress();
+}
+async function stopGenerate(btn){
+  if(btn){ btn.disabled=true; btn.textContent="Stopping…"; }
+  try{ await apiPostJson("/api/generate/cancel",{}); }catch(e){}
+}
+function fmtEta(s){
+  if(!s||s<=0) return "";
+  if(s<60) return "~"+s+"s left";
+  const m=Math.round(s/60); return "~"+m+" min left";
+}
+function genStep(r){
+  const phase=(r.phase||"").toLowerCase();
+  if(phase==="read")  return "Step 1/3 · Reading your files";
+  if(phase==="write") return "Step 2/3 · Writing study sheets";
+  if(phase==="plan")  return "Step 3/3 · Building your plan";
+  if(phase==="prep")  return "Getting ready…";
+  // fallback to old message-based guess
+  const m=(r.message||"").toLowerCase();
+  if(m.startsWith("reading")) return "Step 1/3 · Reading your files";
+  if(m.startsWith("summarizing")||m.startsWith("writing")) return "Step 2/3 · Writing study sheets";
+  if(m.includes("plan")) return "Step 3/3 · Building your plan";
+  return "Working…";
+}
+function restartGenArea(){ openGenerate(); }
+async function pollProgress(){
+  const r=await apiGet("/api/generate/progress");
+  const bar=document.getElementById("gen-bar"),txt=document.getElementById("gen-text");
+  if(!bar) return;
+  const pct=r.total?Math.round(r.done/r.total*100):(r.state==="running"?6:0);
+  bar.style.width=pct+"%";
+  const pctEl=document.getElementById("gen-pct"); if(pctEl) pctEl.textContent=pct+"%";
+  const etaEl=document.getElementById("gen-eta"); if(etaEl) etaEl.textContent=fmtEta(r.eta_sec);
+  const nowEl=document.getElementById("gen-now");
+  const subWrap=document.getElementById("gen-sub");
+  const subBar=document.getElementById("gen-subbar");
+  const subTxt=document.getElementById("gen-subtext");
+  if(r.state==="running"){
+    txt.textContent=`${genStep(r)} — ${r.done}/${r.total} chapters`;
+    // line under the bar: which chapter + how long it's been on it (heartbeat)
+    let now=r.chapter?`📖 ${r.chapter}`:(r.message||"");
+    if(r.ch_elapsed>0) now+=` · ${r.ch_elapsed}s`;
+    if(nowEl) nowEl.textContent=now;
+    // secondary bar for chunk-level read progress
+    if(subWrap){
+      if(r.phase==="read" && r.sub_total>0){
+        subWrap.style.display="block";
+        const sp=Math.round(r.sub_done/r.sub_total*100);
+        if(subBar) subBar.style.width=sp+"%";
+        if(subTxt) subTxt.textContent=`Reading section ${r.sub_done}/${r.sub_total} of this chapter`;
+      } else if(r.phase==="write"){
+        subWrap.style.display="block";
+        if(subBar) subBar.style.width="100%";
+        if(subTxt) subTxt.textContent=`Writing the full study sheet… this is the slow part (${r.ch_elapsed||0}s)`;
+      } else {
+        subWrap.style.display="none";
+      }
+    }
+    setTimeout(pollProgress,800);
+  }
+  else if(r.state==="done"){ bar.style.width="100%"; if(pctEl)pctEl.textContent="100%"; if(etaEl)etaEl.textContent="";
+    if(subWrap)subWrap.style.display="none";
+    txt.textContent="Done — opening your plan…"; if(nowEl)nowEl.textContent=""; setTimeout(()=>location.href="/plan",900); }
+  else if(r.state==="cancelled"){
+    if(subWrap)subWrap.style.display="none"; if(etaEl)etaEl.textContent="";
+    txt.innerHTML=`<span style="color:var(--indigo)">Stopped.</span> ${esc(r.message||"")} Finished chapters are saved &amp; cached — press Start again to resume from here.`;
+    if(nowEl)nowEl.textContent="";
+    const stop=document.getElementById("gen-stop");
+    if(stop){ stop.outerHTML=`<button class="btn-mark gen-start" onclick="restartGenArea()">Start again — resume</button>`; }
+  }
+  else if(r.state==="error"){ if(subWrap)subWrap.style.display="none";
+    txt.innerHTML=`<span style="color:var(--red)">Error: ${esc(r.error||"")} — check the newest file in the logs folder.</span>`; }
+  else setTimeout(pollProgress,800);
+}
+
+async function importSyllabi(input){
+  if(!input || !input.files.length) return;
+  const msg=document.getElementById("syl-import-msg");
+  const count=input.files.length;
+  msg.innerHTML=`<div class="hint"><span class="spinner" style="color:var(--indigo)"></span> Reading ${count} file${count>1?"s":""} and figuring out your subjects…</div>`;
+  const fd=new FormData();
+  for(const f of input.files) fd.append("files", f);
+  input.value="";
+  let r; try{ r=await apiPostForm("/api/syllabus/preview-import",fd); }
+  catch(e){ msg.innerHTML='<div class="callout error">Something went wrong reading those files.</div>'; return; }
+  if(r.error){ msg.innerHTML=`<div class="callout error">${esc(r.error)}</div>`; return; }
+  PREVIEW=r.subjects||[];
+  renderImportPreview(r);
+}
+let PREVIEW=[];
+function renderImportPreview(r){
+  const msg=document.getElementById("syl-import-msg");
+  const list=PREVIEW.map((s,i)=>`<div class="prev-sub-wrap">
+    <details class="prev-sub"><summary>
+      <b>${esc(s.name)}</b><span class="prev-n">${s.chapters.length} chapters</span>
+      <button class="x-btn" title="Remove this subject" onclick="event.preventDefault();event.stopPropagation();dropPreview(${i})">&times;</button>
+    </summary>
+    <div class="prev-ch">${s.chapters.map(c=>esc(c)).join(" · ")}</div></details>
+    <div class="prev-date">${examDatePicker(i, s.exam_date)}</div></div>`).join("");
+  msg.innerHTML=`<div class="prev-box">
+    <div class="prev-title">We read ${r.file_count} file(s) and found ${PREVIEW.length} subject(s):</div>
+    ${r.warning?`<div class="callout error" style="margin:8px 0">${esc(r.warning)}</div>`:""}
+    <div class="prev-list">${list}</div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn-primary btn-sm" onclick="commitImport(this)">Create ${PREVIEW.length} subject(s)</button>
+      <button class="btn-line btn-sm" onclick="cancelImport()">Cancel</button>
+    </div>
+    <div class="hint" style="margin-top:8px">Wrong? Remove any that shouldn't be a subject with ✕, or Cancel and upload them in Step 2 instead.</div>
+  </div>`;
+}
+function dropPreview(i){ PREVIEW.splice(i,1); if(!PREVIEW.length){ cancelImport(); return; } renderImportPreview({file_count:"the",warning:""}); }
+function cancelImport(){ PREVIEW=[]; document.getElementById("syl-import-msg").innerHTML=""; }
+async function commitImport(btn){
+  if(!PREVIEW.length){ cancelImport(); return; }
+  if(btn){ btn.disabled=true; btn.textContent="Creating…"; }
+  const r=await apiPostJson("/api/syllabus/commit-import",{subjects:PREVIEW});
+  if(r.error){ toast(r.error); if(btn){btn.disabled=false;} return; }
+  cancelImport();
+  toast(`Created ${(r.created||[]).length} subject(s).`);
+  loadSubjects();
+}
+
+async function importDB(){
+  const input=document.getElementById("db-file"); if(!input.files.length) return;
+  const msg=document.getElementById("db-msg");
+  if(!confirm("Importing replaces your current data with the backup. Continue?")){ input.value=""; return; }
+  msg.textContent="Importing…";
+  const fd=new FormData(); fd.append("file",input.files[0]);
+  const r=await apiPostForm("/api/db/import",fd); input.value="";
+  if(r.ok){ msg.textContent="Restored: "+Object.entries(r.summary).map(([t,n])=>`${t} ${n}`).join(", "); toast("Backup restored."); loadSubjects(); }
+  else msg.innerHTML=`<span style="color:var(--red)">${esc(r.error)}</span>`;
+}
+
+loadSubjects();
+</script>
+</body>
+</html>

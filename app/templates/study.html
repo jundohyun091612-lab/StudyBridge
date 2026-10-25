@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBridge · Study</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ ASSET_V }}">
+  <script src="/static/app.js?v={{ ASSET_V }}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    if (window.mermaid) { mermaid.initialize({ startOnLoad:false, theme:"neutral", securityLevel:"loose" }); }
+    // Render any unprocessed .mermaid blocks; safe to call repeatedly.
+    async function renderMermaid(root){
+      if(!window.mermaid) return;
+      const nodes=[...(root||document).querySelectorAll(".mermaid:not([data-processed])")];
+      if(!nodes.length) return;
+      try{ await mermaid.run({ nodes }); }catch(e){ console.warn("mermaid render", e); }
+    }
+  </script>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="mark"></span> StudyBridge</div>
+    <div class="nav">
+      <a href="/dashboard">Prepare</a>
+      <a href="/plan">Plan</a>
+      <a href="/study" class="active">Study</a>
+      <span class="who">{{ user.name }}</span>
+      <a href="/logout">Sign out</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="content"></div>
+  </div>
+  <div id="print-area"></div>
+
+<script>
+let DATA = null;
+let CUR_SUBJ = null;   // index into DATA.subjects
+let CUR_CH = null;     // chapter id
+
+// subject accent colors (Ink & Highlighter palette extension)
+const SUBJ_COLORS = ["#4338ca","#0e7c66","#b4530a","#9b2c6f","#1f6f9c","#7a5b15","#5b3aa6","#176b3a"];
+function subjColor(i){ return SUBJ_COLORS[i % SUBJ_COLORS.length]; }
+
+function fmtDay(iso){
+  if(!iso) return "";
+  const d=new Date(iso+"T00:00:00");
+  if(isNaN(d)) return iso;
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+
+async function load() {
+  DATA = await apiGet("/api/study-data");
+  if (!DATA.subjects.length) {
+    document.getElementById("content").innerHTML =
+      `<div class="empty-state"><div class="big">No study sheets yet.</div>
+       Go to Prepare, add your files, and press “Start — make my study sheets”.
+       <div style="margin-top:16px"><a href="/dashboard" class="btn-primary" style="text-decoration:none;padding:11px 18px;border-radius:10px">Go to Prepare</a></div></div>`;
+    return;
+  }
+  // honor ?chapter=ID deep link from Plan -> open that subject + chapter
+  const param = new URLSearchParams(location.search).get("chapter");
+  if (param){
+    const cid = parseInt(param);
+    for (let si=0; si<DATA.subjects.length; si++){
+      if (DATA.subjects[si].chapters.some(c=>c.id===cid)){ openSubject(si, cid); return; }
+    }
+  }
+  renderShelf();
+}
+
+/* ---------- View A: the bookshelf ---------- */
+function renderShelf(){
+  CUR_SUBJ = null;
+  const books = DATA.subjects.map((s,i)=>{
+    const col = subjColor(i);
+    const nDates = new Set(s.chapters.flatMap(c=>(c.plan||[]).map(p=>p.day))).size;
+    return `<button class="book" style="--c:${col}" onclick="openSubject(${i})">
+      <span class="book-spine"></span>
+      <span class="book-body">
+        <span class="book-title">${esc(s.subject)}</span>
+        <span class="book-meta">${s.chapters.length} chapter${s.chapters.length>1?"s":""}${nDates?` · ${nDates} study day${nDates>1?"s":""}`:""}</span>
+      </span>
+    </button>`;
+  }).join("");
+  document.getElementById("content").innerHTML = `
+    <h1 class="page-title">Your study shelf</h1>
+    <p class="page-sub">Pick a subject to open its study book — schedule and chapter sheets inside.</p>
+    <div class="shelf">${books}</div>`;
+}
+
+/* ---------- View B: one opened subject ---------- */
+function openSubject(si, wantChapterId){
+  CUR_SUBJ = si;
+  const s = DATA.subjects[si];
+  const col = subjColor(si);
+  // schedule for THIS subject only, ordered by date
+  const sched = [];
+  s.chapters.forEach(c => (c.plan||[]).forEach(p => sched.push({...p, chapter:c.name, cid:c.id})));
+  sched.sort((a,b)=>(a.day||"").localeCompare(b.day||""));
+  const schedRows = sched.length
+    ? sched.map(p=>`<button class="sb-row ${p.done?"done":""}" onclick="selectChapter(${p.cid})">
+        <span class="sb-date">${fmtDay(p.day)}</span>
+        <span class="sb-ch">${esc(p.chapter)}</span>
+        <span class="sb-task">${esc(p.task||"")}</span></button>`).join("")
+    : `<div class="hint" style="padding:10px 0">No study dates yet — make a plan in Prepare.</div>`;
+
+  const chList = s.chapters.map(c=>{
+    const day = c.plan && c.plan.length ? c.plan[0].day : null;
+    return `<button class="ch2" id="ch-${c.id}" onclick="selectChapter(${c.id})">
+      <span class="ch2-name">${esc(c.name)}</span>
+      <span class="ch2-tags">${c.ai_generated?'<span class="badge badge-ai">AI</span>':''}${day?`<span class="ch2-day">${fmtDay(day)}</span>`:''}</span>
+    </button>`;
+  }).join("");
+
+  document.getElementById("content").innerHTML = `
+    <div class="book-head" style="--c:${col}">
+      <button class="back-btn" onclick="renderShelf()">← Shelf</button>
+      <h1 class="book-h1">${esc(s.subject)}</h1>
+      <div class="book-actions no-print">
+        <button class="btn-line btn-sm" onclick="printScope('subject')">🖨 Print whole subject</button>
+        <button class="btn-ghost btn-sm" onclick="printScope('all')">Print all subjects</button>
+      </div>
+    </div>
+    <div class="book-layout">
+      <aside class="book-side">
+        <div class="side-card">
+          <div class="side-title">🗓️ Schedule</div>
+          <div class="sched-list">${schedRows}</div>
+        </div>
+        <div class="side-card">
+          <div class="side-title">Chapters</div>
+          <div class="ch2-list">${chList}</div>
+        </div>
+        <div class="side-card">
+          <div class="side-title">📝 Practice exam</div>
+          <button class="btn-mark btn-sm" style="width:100%" onclick="genMockExam(${s.subject_id})">Generate practice exam</button>
+          <div class="hint" style="margin-top:6px">40 questions across the whole subject, with answer key.</div>
+          <div class="exam-list" id="exam-list-${s.subject_id}"></div>
+        </div>
+      </aside>
+      <section class="book-main"><div id="sheet-host"></div></section>
+    </div>`;
+  loadExams(s.subject_id);
+
+  const first = wantChapterId && s.chapters.find(c=>c.id===wantChapterId);
+  selectChapter((first||s.chapters[0]).id);
+}
+
+function findChapter(id){
+  for (const s of DATA.subjects) for (const c of s.chapters) if (c.id===id) return {s,c};
+  return null;
+}
+
+function selectChapter(id){
+  CUR_CH = id;
+  const hit = findChapter(id); if(!hit) return;
+  const {c} = hit;
+  document.querySelectorAll(".ch2").forEach(e=>e.classList.remove("active"));
+  const tab=document.getElementById("ch-"+id); if(tab) tab.classList.add("active");
+  const stamp = c.ai_generated
+    ? `<div class="badge badge-ai no-print" style="margin-bottom:14px">&#9888; AI-generated — written from standard-curriculum knowledge without your own files, so it may differ from what your class covered.</div>` : "";
+  const sched = (c.plan && c.plan.length)
+    ? `<div class="sched-strip"><span class="sched-lbl">🗓️ Study days</span>${c.plan.map(p=>`<span class="sched-pill ${p.done?"done":""}" title="${esc(p.task||"")}">${fmtDay(p.day)}</span>`).join("")}<a class="sched-link no-print" href="/plan">Full plan →</a></div>`
+    : "";
+  document.getElementById("sheet-host").innerHTML = `
+    ${stamp}${sched}
+    <div id="sheet-mount"></div>
+    <div class="no-print sheet-tools">
+      <button class="btn-line btn-sm" onclick="printScope('chapter')">🖨 Print this chapter</button>
+    </div>
+    <div class="qa card" id="qa-card">
+      <h2>Ask more about this chapter</h2>
+      <div id="qa-log"></div>
+      <div class="qa-input">
+        <input type="text" id="qa-q" placeholder="Ask anything about this chapter" onkeydown="if(event.key==='Enter')askQ()">
+        <button class="btn-primary" onclick="askQ()">Ask</button>
+      </div>
+    </div>`;
+  const mount=document.getElementById("sheet-mount");
+  mount.appendChild(decorateSheet(c.html));
+  renderMermaid(mount);
+  loadQA(id);
+}
+
+/* ---------- practice / mock exam ---------- */
+async function loadExams(subjectId){
+  const host=document.getElementById("exam-list-"+subjectId);
+  if(!host) return;
+  try{
+    const all=(await apiGet("/api/mock-exam/list")).exams||[];
+    const mine=all.filter(e=>e.subject_id===subjectId);
+    host.innerHTML = mine.length
+      ? mine.map(e=>`<div class="exam-row"><button class="exam-open" onclick="openExam(${e.id})">${esc(e.title)}</button>
+          <button class="x-btn" title="Delete" onclick="delExam(${e.id},${subjectId})">&times;</button></div>`).join("")
+      : `<div class="hint" style="margin-top:6px">No practice exams yet.</div>`;
+  }catch(e){ host.innerHTML=""; }
+}
+async function genMockExam(subjectId){
+  const host=document.getElementById("exam-list-"+subjectId);
+  if(host) host.innerHTML=`<div class="hint" style="margin-top:6px"><span class="spinner" style="color:var(--indigo)"></span> Writing a 40-question exam… this takes a bit.</div>`;
+  try{
+    const r=await apiPostJson("/api/mock-exam/generate",{subject_id:subjectId});
+    if(!r.ok){ toast(r.error||"Couldn't generate exam"); loadExams(subjectId); return; }
+    toast("Practice exam ready.");
+    await loadExams(subjectId);
+    openExam(r.id);
+  }catch(e){ toast("Couldn't generate exam"); loadExams(subjectId); }
+}
+async function delExam(id, subjectId){
+  if(!confirm("Delete this practice exam?")) return;
+  await fetch("/api/mock-exam/"+id,{method:"DELETE"});
+  loadExams(subjectId);
+}
+async function openExam(id){
+  const e=await apiGet("/api/mock-exam/"+id);
+  const host=document.getElementById("sheet-host");
+  host.innerHTML=`
+    <div class="exam-view">
+      <div class="exam-head no-print">
+        <h2>${esc(e.title)}</h2>
+        <div>
+          <button class="btn-line btn-sm" onclick="toggleAnswers(this)">Show answers</button>
+          <button class="btn-line btn-sm" onclick="window.print()">🖨 Print</button>
+        </div>
+      </div>
+      <div class="sheet workbook" id="exam-body"></div>
+    </div>`;
+  const body=document.getElementById("exam-body");
+  body.innerHTML=e.html;
+  // hide the answer key until the student wants it
+  const ak=[...body.querySelectorAll("h2")].find(h=>/answer key/i.test(h.textContent));
+  if(ak){ let n=ak; const hide=[]; while(n){ hide.push(n); n=n.nextElementSibling; }
+    hide.forEach(el=>el.classList.add("answer-key")); }
+  renderMermaid(body);
+}
+function toggleAnswers(btn){
+  const on=document.body.classList.toggle("show-answers");
+  btn.textContent = on ? "Hide answers" : "Show answers";
+}
+
+/* ---------- decorate the 11-section sheet into a workbook ---------- */
+const SEC_ICONS = {1:"📘",2:"🔑",3:"📖",4:"🔗",5:"💡",6:"⚠️",7:"⭐",8:"🎯",9:"✏️",10:"✅",11:"⏱️"};
+function decorateSheet(html, forPrint){
+  const tmp=document.createElement("div"); tmp.innerHTML=html;
+  const sheet=document.createElement("div"); sheet.className="sheet workbook";
+  let cur=null;
+  const flush=()=>{ if(cur){ sheet.appendChild(cur); cur=null; } };
+  [...tmp.childNodes].forEach(node=>{
+    if(node.nodeType===1 && node.tagName==="H1"){ flush(); node.classList.add("sheet-title"); sheet.appendChild(node); return; }
+    if(node.nodeType===1 && node.tagName==="H2"){
+      flush();
+      const m=(node.textContent||"").match(/^\s*(\d+)/); const num=m?parseInt(m[1]):0;
+      cur=document.createElement("section"); cur.className="sheet-sec sec-"+num;
+      const ic=document.createElement("span"); ic.className="sec-ic"; ic.textContent=SEC_ICONS[num]||"•";
+      node.insertBefore(ic, node.firstChild); cur.appendChild(node);
+    } else { if(!cur){ cur=document.createElement("section"); cur.className="sheet-sec"; } cur.appendChild(node); }
+  });
+  flush();
+  const ans=sheet.querySelector(".sec-10");
+  if(ans && !forPrint){
+    const body=document.createElement("div"); body.className="answers-body";
+    [...ans.children].forEach(ch=>{ if(ch.tagName!=="H2") body.appendChild(ch); });
+    const btn=document.createElement("button"); btn.className="btn-line btn-sm reveal-btn no-print"; btn.textContent="Reveal answers";
+    btn.onclick=()=>{ body.classList.toggle("open"); btn.textContent=body.classList.contains("open")?"Hide answers":"Reveal answers"; };
+    ans.appendChild(btn); ans.appendChild(body);
+  }
+  return sheet;
+}
+
+/* ---------- PDF / print: chapter, whole subject, or everything ---------- */
+function printScope(scope){
+  const area=document.getElementById("print-area");
+  area.innerHTML="";
+  const addSheet=(c, subjName)=>{
+    const wrap=document.createElement("div"); wrap.className="print-chapter";
+    const sub=document.createElement("div"); sub.className="print-subj"; sub.textContent=subjName;
+    wrap.appendChild(sub);
+    wrap.appendChild(decorateSheet(c.html, true));  // answers expanded for print
+    area.appendChild(wrap);
+  };
+  if(scope==="chapter"){
+    const hit=findChapter(CUR_CH); if(hit) addSheet(hit.c, hit.s.subject);
+  } else if(scope==="subject"){
+    const s=DATA.subjects[CUR_SUBJ]; s.chapters.forEach(c=>addSheet(c, s.subject));
+  } else {
+    DATA.subjects.forEach(s=>s.chapters.forEach(c=>addSheet(c, s.subject)));
+  }
+  document.body.classList.add("printing");
+  window.print();
+  setTimeout(()=>{ document.body.classList.remove("printing"); area.innerHTML=""; }, 500);
+}
+
+/* ---------- Q&A ---------- */
+async function loadQA(id){ const r=await apiGet("/api/qa/"+id); renderQA(r.history); }
+function renderQA(history){
+  const log=document.getElementById("qa-log"); if(!log) return;
+  log.innerHTML=history.map(h=>`<div class="bubble ${h.role==="ai"?"ai":"user"}">${esc(h.content)}</div>`).join("");
+  log.scrollTop=log.scrollHeight;
+}
+async function askQ(){
+  const input=document.getElementById("qa-q"); const q=input.value.trim(); if(!q) return;
+  input.value="";
+  const log=document.getElementById("qa-log");
+  log.innerHTML+=`<div class="bubble user">${esc(q)}</div><div class="bubble ai" id="pending"><span class="spinner" style="border-color:var(--indigo);border-top-color:transparent"></span></div>`;
+  log.scrollTop=log.scrollHeight;
+  const r=await apiPostJson("/api/qa",{chapter_id:CUR_CH, question:q});
+  document.getElementById("pending").outerHTML=`<div class="bubble ai">${esc(r.answer||r.error||"Error")}</div>`;
+  log.scrollTop=log.scrollHeight;
+}
+
+load();
+</script>
+</body>
+</html>

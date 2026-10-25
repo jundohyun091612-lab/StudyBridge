@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBridge · Sign in</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ ASSET_V }}">
+  <style>
+    body { background: var(--ink); }
+    .auth { min-height: 100vh; display: grid; grid-template-columns: 1.05fr .95fr; }
+
+    /* ---- left: brand / story panel ---- */
+    .auth-brand {
+      position: relative; overflow: hidden; padding: 54px 56px;
+      color: #fff; display: flex; flex-direction: column; justify-content: space-between;
+      background:
+        radial-gradient(700px 380px at 18% 8%, rgba(109,91,208,.55), transparent 60%),
+        radial-gradient(620px 420px at 92% 100%, rgba(67,56,202,.5), transparent 60%),
+        var(--ink);
+    }
+    .auth-logo { display: flex; align-items: center; gap: 12px; font-family: var(--display);
+      font-weight: 700; font-size: 22px; letter-spacing: -0.01em; z-index: 2; }
+    .auth-logo .mark { width: 32px; height: 32px; border-radius: 9px; position: relative;
+      background: linear-gradient(150deg, var(--violet), var(--indigo)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+    .auth-logo .mark::after { content: ""; position: absolute; left: 5px; right: 5px; top: 14px; height: 4px;
+      background: var(--mark); border-radius: 2px; }
+
+    .auth-hero { z-index: 2; max-width: 460px; }
+    .auth-hero .eyebrow { color: var(--mark); }
+    .auth-hero .eyebrow::before { background: var(--mark); }
+    .auth-hero h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 3.6vw, 44px);
+      line-height: 1.08; letter-spacing: -0.02em; margin: 14px 0 14px; }
+    .auth-hero h1 .hl { background: linear-gradient(transparent 60%, rgba(255,176,32,.85) 60%); padding: 0 3px; }
+    .auth-hero p { color: #c2c7e8; font-size: 15.5px; margin: 0; }
+
+    .auth-steps { display: flex; gap: 22px; z-index: 2; margin-top: 8px; }
+    .auth-steps .s { flex: 1; }
+    .auth-steps .s .num { font-family: var(--display); font-weight: 700; color: var(--mark); font-size: 15px; }
+    .auth-steps .s .lbl { font-weight: 600; font-size: 14px; margin-top: 2px; }
+    .auth-steps .s .d { color: #9aa0c8; font-size: 12.5px; margin-top: 2px; }
+
+    /* bridge motif along the bottom */
+    .auth-bridge { position: absolute; left: 0; right: 0; bottom: 0; height: 120px; z-index: 1; opacity: .9; }
+
+    /* ---- right: form ---- */
+    .auth-form { background: var(--bg); display: grid; place-items: center; padding: 30px; }
+    .auth-card { width: 100%; max-width: 372px; }
+    .auth-card h2 { font-family: var(--display); font-size: 24px; letter-spacing: -0.01em; margin: 0 0 4px; }
+    .auth-card .sub { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
+    .auth-card button { width: 100%; margin-top: 8px; padding: 13px; font-size: 15px; justify-content: center; }
+    .auth-note { color: var(--muted); font-size: 12px; text-align: center; margin-top: 16px; }
+    .auth-mobile-logo { display: none; }
+
+    @media (max-width: 860px) {
+      .auth { grid-template-columns: 1fr; }
+      .auth-brand { display: none; }
+      .auth-mobile-logo { display: flex; align-items: center; gap: 10px; justify-content: center;
+        font-family: var(--display); font-weight: 700; font-size: 20px; margin-bottom: 22px; }
+      .auth-mobile-logo .mark { width: 28px; height: 28px; border-radius: 8px; position: relative;
+        background: linear-gradient(150deg, var(--violet), var(--indigo)); }
+      .auth-mobile-logo .mark::after { content:""; position:absolute; left:5px; right:5px; top:12px; height:3px; background:var(--mark); border-radius:2px; }
+    }
+  </style>
+  <link rel="stylesheet" href="/static/v3.css?v={{ ASSET_V }}">
+</head>
+<body class="auth-v3">
+  <div class="auth">
+    <div class="auth-brand">
+      <div class="auth-logo"><span class="mark"></span> StudyBridge</div>
+
+      <div class="auth-hero">
+        <div class="eyebrow">From files to finals</div>
+        <h1>Your class materials, built into a <span class="hl">study plan</span>.</h1>
+        <p>Upload your notes, slides, and PDFs. StudyBridge sorts them into chapters, writes your study sheets, and schedules every day up to the exam.</p>
+      </div>
+
+      <div class="auth-steps">
+        <div class="s"><div class="num">01</div><div class="lbl">Add subjects</div><div class="d">Exam date, scope &amp; syllabus</div></div>
+        <div class="s"><div class="num">02</div><div class="lbl">Drop materials</div><div class="d">Sorted into chapters for you</div></div>
+        <div class="s"><div class="num">03</div><div class="lbl">Generate</div><div class="d">Sheets + a dated plan</div></div>
+      </div>
+
+      <svg class="auth-bridge" viewBox="0 0 800 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="0" y1="78" x2="800" y2="78" stroke="rgba(255,255,255,.16)" stroke-width="2"/>
+        <g stroke="rgba(255,255,255,.16)" stroke-width="2">
+          <line x1="120" y1="78" x2="60"  y2="120"/><line x1="120" y1="78" x2="180" y2="120"/>
+          <line x1="400" y1="78" x2="340" y2="120"/><line x1="400" y1="78" x2="460" y2="120"/>
+          <line x1="680" y1="78" x2="620" y2="120"/><line x1="680" y1="78" x2="740" y2="120"/>
+        </g>
+        <g fill="#ffb020">
+          <circle cx="120" cy="78" r="5"/><circle cx="400" cy="78" r="5"/><circle cx="680" cy="78" r="5"/>
+        </g>
+        <path d="M0 78 Q 400 30 800 78" fill="none" stroke="rgba(255,176,32,.5)" stroke-width="2"/>
+      </svg>
+    </div>
+
+    <div class="auth-form">
+      <div class="auth-card fade-up">
+        <div class="auth-mobile-logo"><span class="mark"></span> StudyBridge</div>
+        <h2>Welcome back</h2>
+        <p class="sub">Sign in to pick up where you left off.</p>
+        {% if error %}<div class="callout error" style="margin-bottom:16px">{{ error }}</div>{% endif %}
+        <form method="post" action="/login">
+          <div class="field"><label>Email</label>
+            <input type="text" name="login_id" autocomplete="username" value="{{ default.login_id }}" required></div>
+          <div class="field"><label>Password</label>
+            <input type="password" name="password" autocomplete="current-password" value="{{ default.password }}" required></div>
+          <button type="submit" class="btn-primary">Sign in</button>
+        </form>
+        <p class="auth-note">Demo credentials are pre-filled for testing.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

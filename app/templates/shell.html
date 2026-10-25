@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBridge</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="/static/v2.css?v={{ ASSET_V }}">
+  <script src="/static/app.js?v={{ ASSET_V }}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    if (window.mermaid) mermaid.initialize({ startOnLoad:false, theme:"base", securityLevel:"loose", themeVariables:{ darkMode:true, background:"transparent", primaryColor:"#16213d", primaryTextColor:"#eef0ff", primaryBorderColor:"#3d7bff", secondaryColor:"#16325a", tertiaryColor:"#1a1f45", lineColor:"#8e94c4", textColor:"#dfe3ff", fontFamily:"Pretendard, sans-serif", fontSize:"14px" } });
+    async function renderMermaid(root){
+      if(!window.mermaid) return;
+      const nodes=[...(root||document).querySelectorAll(".mermaid:not([data-processed])")];
+      if(!nodes.length) return;
+      try{ await mermaid.run({ nodes }); }catch(e){ console.warn("mermaid", e); }
+    }
+  </script>
+  <style>
+    /* ---- chapter-setup wizard (method chooser) ---- */
+    .ed-methods{ display:grid; gap:10px; margin:8px 0 14px; }
+    .ed-method{ display:flex; gap:12px; align-items:center; padding:12px 14px; border:1.5px solid var(--line,#e5e7eb);
+      border-radius:12px; cursor:pointer; background:var(--bg-1,#fff); transition:border-color .15s, box-shadow .15s, background .15s; }
+    .ed-method:hover{ border-color:var(--indigo,#3d7bff); }
+    .ed-method.sel{ border-color:var(--indigo,#3d7bff); background:rgba(61,123,255,.08);
+      box-shadow:0 0 0 3px rgba(67,56,202,.12); }
+    .edm-ic{ font-size:22px; width:34px; text-align:center; flex:none; }
+    .edm-t{ font-weight:600; font-size:14px; }
+    .edm-d{ font-size:12.5px; color:var(--muted,#6b7280); margin-top:1px; }
+    .ed-back{ background:none; border:none; color:var(--indigo,#3d7bff); cursor:pointer;
+      font-size:13px; padding:2px 0 10px; }
+    #ed-next:disabled{ opacity:.45; cursor:not-allowed; }
+    /* ---- chapter slots (with exam-scope checkbox) ---- */
+    .slot-head{ display:flex; justify-content:space-between; font-weight:600; font-size:13px; margin:2px 0 8px; }
+    #ed-slots{ display:flex; flex-direction:column; gap:8px; }
+    .slot{ display:flex; align-items:center; gap:10px; padding:8px 10px; border:1.5px solid var(--line,#e5e7eb);
+      border-radius:10px; background:var(--bg-1,#fff); }
+    .slot:has(.slot-scope:not(:checked)){ opacity:.5; background:var(--bg-2,#f3f4f6); }
+    .slot-chk{ display:flex; align-items:center; }
+    .slot-scope{ width:18px; height:18px; cursor:pointer; }
+    .slot-name{ flex:1; border:none; background:transparent; font-size:14px; padding:4px 2px; }
+    .slot-name:focus{ outline:none; }
+    .slot-x{ background:none; border:none; color:var(--muted,#9ca3af); font-size:18px; cursor:pointer; line-height:1; padding:0 4px; }
+    .slot-x:hover{ color:#dc2626; }
+    .slot-add{ align-self:flex-start; margin-top:10px; background:none; border:1.5px dashed var(--line,#cbd5e1);
+      color:var(--indigo,#3d7bff); border-radius:10px; padding:8px 14px; cursor:pointer; font-size:13px; font-weight:600; }
+    .slot-add:hover{ border-color:var(--indigo,#3d7bff); }
+  </style>
+  <link rel="stylesheet" href="/static/v3.css?v={{ ASSET_V }}">
+</head>
+<body class="v2">
+<div class="shell" id="shell">
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="side">
+    <div class="side-brand"><span class="mark"></span><span class="txt">StudyBridge</span></div>
+    <div class="side-user" onclick="editGrade()" title="Change grade" style="cursor:pointer">
+      <div class="ava">{{ user.name[0] }}</div>
+      <div class="u-meta"><b>{{ user.name }}</b><small id="u-grade">Grade {{ user.grade }} · edit</small></div>
+    </div>
+    <div class="streak-chip cold" id="side-streak" title="Study any day to keep your streak">
+      <span class="streak-fire">🔥</span><span class="streak-txt"><span id="streak-num">0</span>-day streak</span>
+    </div>
+    <button class="newbtn" onclick="go('#/new')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span><span>New</span></button>
+
+    <a class="nav-item" data-route="home" onclick="go('#/home')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg></span><span class="txt">Home</span></a>
+    <a class="nav-item" data-route="sheets" onclick="go('#/sheets')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z"/></svg></span><span class="txt">Study sheets</span></a>
+    <a class="nav-item" data-route="review" onclick="go('#/review')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></span><span class="txt">Review</span><span class="due-badge" id="review-badge" style="display:none">0</span></a>
+    <a class="nav-item" data-route="plan" onclick="go('#/plan')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><span class="txt">Study plan</span></a>
+    <a class="nav-item" data-route="weak" onclick="go('#/weak')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span><span class="txt">Weak spots</span></a>
+    <a class="nav-item" data-route="pdf" onclick="go('#/pdf')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></svg></span><span class="txt">Print &amp; PDF</span></a>
+
+    <div class="side-sec">My subjects</div>
+    <div id="side-subjects"></div>
+
+    <div class="side-sec">Recent</div>
+    <div id="side-recent"></div>
+
+    <div class="side-spacer"></div>
+    <div class="side-sec">Tools</div>
+    <a class="nav-item" onclick="location.href='/api/db/export'"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span><span class="txt">Download backup</span></a>
+    <label class="nav-item" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/></svg></span><span class="txt">Restore backup</span>
+      <input type="file" id="db-file" accept=".json" style="display:none" onchange="importDB()"></label>
+    <a class="nav-item" href="/logout"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></span><span class="txt">Sign out</span></a>
+    <button class="side-collapse" onclick="document.getElementById('shell').classList.toggle('collapsed')" title="Collapse">⟨</button>
+  </aside>
+
+  <!-- ===================== WORKSPACE ===================== -->
+  <main class="work" id="work"><p class="hint">Loading…</p></main>
+</div>
+<div id="print-area"></div>
+
+<script>
+/* ============================ state ============================ */
+let SUBJECTS = [];      // /api/subjects (chapters+materials)
+let STUDY = null;       // /api/study-data (sheets)
+let RECENT = [];
+let STREAK = {current:0, studied_today:false, review_due:0};
+/* line icons (Lucide-style) used across the redesigned UI */
+const ICON_PATHS={
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  flame:'<path d="M12 2c1 4 5 5.5 5 11a5 5 0 0 1-10 0c0-2.5 1.2-4 2.5-5 .2 2 1 3 2 3.5C11 9 11 5 12 2z"/>',
+  repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  cal:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  arrow:'<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+  play:'<path d="M7 4v16l13-8z"/>',
+  book:'<path d="M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z"/>',
+  pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+};
+function icon(n){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[n]||""}</svg>`; }
+
+const SUBJ_COLORS = ["#8fb8ff","#34e3a4","#ffb547","#ff7ab8","#38d5ff","#e8d06a","#7dd3fc","#6fe39a"];
+function subjColor(i){ return SUBJ_COLORS[i % SUBJ_COLORS.length]; }
+function go(hash){ location.hash = hash; }
+function fmtExamDate(d){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||""); if(!m) return d||"";
+  const M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return `${M[+m[2]-1]} ${+m[3]}, ${m[1]}`; }
+function fmtDay(iso){ if(!iso) return ""; const d=new Date(iso+"T00:00:00"); return isNaN(d)?iso:d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
+function daysLeft(d){ if(!d) return null; return Math.round((new Date(d+"T00:00:00")-new Date(new Date().toDateString()))/86400000); }
+
+/* sheet/study lookups */
+function studyChapters(){ const out=[]; if(!STUDY) return out;
+  STUDY.subjects.forEach(s=>s.chapters.forEach(c=>out.push({...c, subject:s.subject, subject_id:s.subject_id}))); return out; }
+function findSheet(cid){ return studyChapters().find(c=>c.id===cid); }
+function sheetCountFor(subjectName){ if(!STUDY) return 0; const s=STUDY.subjects.find(x=>x.subject===subjectName); return s?s.chapters.length:0; }
+
+/* ============================ data load ============================ */
+async function loadAll(){
+  [SUBJECTS, STUDY, RECENT] = await Promise.all([
+    apiGet("/api/subjects").then(r=>r.subjects),
+    apiGet("/api/study-data").catch(()=>({subjects:[]})),
+    apiGet("/api/recent").then(r=>r.recent).catch(()=>[]),
+  ]);
+  renderSidebar();
+  refreshStreak();
+}
+async function refreshStreak(){
+  let s; try{ s=await apiGet("/api/streak"); }catch(e){ return; }
+  STREAK=s;
+  const hs=document.getElementById("st-streak"); if(hs) hs.textContent=s.current||0;
+  const hr=document.getElementById("st-review"); if(hr) hr.textContent=s.review_due||0;
+  const chip=document.getElementById("side-streak"), num=document.getElementById("streak-num");
+  if(num) num.textContent=s.current||0;
+  if(chip) chip.classList.toggle("cold", !s.studied_today);   // grey until you study today
+  const b=document.getElementById("review-badge");
+  if(b){ if(s.review_due>0){ b.style.display=""; b.textContent=s.review_due; } else { b.style.display="none"; } }
+}
+function renderSidebar(){
+  const host=document.getElementById("side-subjects");
+  host.innerHTML = SUBJECTS.length
+    ? SUBJECTS.map(s=>`<a class="nav-item" data-route="subject-${s.id}" onclick="go('#/subject/${s.id}')"><span class="ic">${icon("folder")}</span><span class="txt">${esc(s.name)}</span></a>`).join("")
+    : `<div class="hint" style="padding:4px 12px;font-size:12px">None yet — press ＋ New</div>`;
+  const rc=document.getElementById("side-recent");
+  rc.innerHTML = RECENT.length
+    ? RECENT.slice(0,5).map(r=>`<a class="nav-item" onclick="go('#/study/${r.cid}')"><span class="ic">${icon("clock")}</span><span class="txt">${esc(r.chapter)}</span></a>`).join("")
+    : `<div class="hint" style="padding:4px 12px;font-size:12px">Nothing yet</div>`;
+  highlightNav();
+}
+function highlightNav(){
+  const r=location.hash;
+  document.querySelectorAll(".nav-item").forEach(e=>e.classList.remove("active"));
+  let key=null;
+  if(r.startsWith("#/home")||r===""||r==="#") key="home";
+  else if(r.startsWith("#/sheets")) key="sheets";
+  else if(r.startsWith("#/review")) key="review";
+  else if(r.startsWith("#/plan")) key="plan";
+  else if(r.startsWith("#/weak")) key="weak";
+  else if(r.startsWith("#/pdf")) key="pdf";
+  else if(r.startsWith("#/subject/")) key="subject-"+r.split("/")[2];
+  else if(r.startsWith("#/study/")){ const c=findSheet(parseInt(r.split("/")[2])); if(c) key="subject-"+c.subject_id; }
+  if(key){ const el=document.querySelector(`.nav-item[data-route="${key}"]`); if(el) el.classList.add("active"); }
+}
+
+/* ============================ router ============================ */
+async function route(){
+  const work=document.getElementById("work");
+  const h=location.hash || "#/home";
+  highlightNav();
+  if(h.startsWith("#/home")) return renderHome();
+  if(h.startsWith("#/sheets")) return renderSheets();
+  if(h.startsWith("#/review")) return renderReview();
+  if(h.startsWith("#/new")) return renderNew();
+  if(h.startsWith("#/plan")) return renderPlan();
+  if(h.startsWith("#/weak")) return renderWeak();
+  if(h.startsWith("#/pdf")) return renderPdf(parseInt(h.split("/")[2])||0);
+  if(h.startsWith("#/subject/")) return renderSubject(parseInt(h.split("/")[2]));
+  if(h.startsWith("#/study/")) return renderStudy(parseInt(h.split("/")[2]));
+  renderHome();
+}
+window.addEventListener("hashchange", route);
+
+/* ============================ HOME ============================ */
+/* progress ring (SVG) used by the dashboard tiles and subject cards */
+function ringSVG(pct,c1,c2,label){
+  const r=22, C=2*Math.PI*r, off=C*(1-Math.max(0,Math.min(1,pct)));
+  const id="rg"+Math.random().toString(36).slice(2,8);
+  return `<svg viewBox="0 0 54 54"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>
+    <circle cx="27" cy="27" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5"/>
+    <circle cx="27" cy="27" r="${r}" fill="none" stroke="url(#${id})" stroke-width="5" stroke-linecap="round"
+      stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 27 27)" style="filter:drop-shadow(0 0 4px ${c2})"/>
+    <text x="27" y="31" text-anchor="middle" class="ring-txt">${label}</text></svg>`;
+}
+const SUBJ_GRADS=[["#4f8cff","#5b7cff"],["#38d5ff","#2f7bff"],["#ff7ab8","#ff5c7a"],["#3ff0b0","#13b67d"],["#ffb547","#ff7a59"],["#94a3b8","#475569"]];
+const ORB_HTML=`<div class="orb-stage"><div class="orb-3d"><div class="orb-ring r3"></div><div class="orb-ring r1"><span class="orb-sat"></span></div><div class="orb-ring r2"></div><div class="orb-core"></div></div><div class="orb-glow"></div></div>`;
+
+/* ============================ HOME (dashboard) ============================ */
+function renderHome(){
+  const work=document.getElementById("work");
+  const h=new Date().getHours(); const greet=h<12?"Good morning":h<18?"Good afternoon":"Good evening";
+  const first=((document.querySelector(".u-meta b")||{}).textContent||"").trim().split(" ")[0];
+  const hello=`${greet}${first?", "+esc(first):""}`;
+  if(!SUBJECTS.length){
+    work.innerHTML=`<section class="hero3"><div>
+        <div class="eyebrow3">${hello}</div>
+        <h1>Turn your class files into <span class="grad-text">a plan that works</span>.</h1>
+        <p>Add a subject, drop your notes or pick your classes, and StudyBridge builds study sheets and a day-by-day plan up to the exam.</p>
+        <button class="btn-primary2 btn-xl" onclick="go('#/new')">Add your first subject →</button>
+      </div>${ORB_HTML}</section>`;
+    return;
+  }
+  const all=studyChapters();
+  const studiedN=all.filter(c=>c.studied).length, totalN=all.length;
+  // next up = the unstudied chapter whose planned day comes first
+  let next=null, best=null;
+  all.forEach(c=>{ if(c.studied) return;
+    const d=(c.plan&&c.plan.length)?c.plan.map(p=>p.day).sort()[0]:"9999";
+    if(best===null||d<best){ best=d; next=c; } });
+  let ne=null;   // nearest upcoming exam
+  SUBJECTS.forEach(s=>{ const n=daysLeft(s.exam_date); if(n!=null&&n>=0&&(ne===null||n<ne.n)) ne={n,s}; });
+
+  const heroTitle = next ? `Next up: <span class="grad-text">${esc(next.name)}</span>`
+    : (totalN ? `You're <span class="grad-text">all caught up</span>` : `Let's build your <span class="grad-text">first sheets</span>`);
+  const heroSub = next ? `${esc(next.subject)}. Read the sheet, test yourself, then mark it studied to light up your map.`
+    : (totalN ? "Every chapter is studied. Keep them fresh with today's review cards."
+              : "Open a subject and press Build to turn your chapters into study sheets and a plan.");
+  const heroBtn = next ? `<button class="btn-primary2 btn-xl" onclick="go('#/study/${next.id}')">Continue studying →</button>`
+    : (STREAK.review_due ? `<button class="btn-primary2 btn-xl" onclick="go('#/review')">Start review →</button>`
+       : `<button class="btn-primary2 btn-xl" onclick="go('#/subject/${SUBJECTS[0].id}')">Open ${esc(SUBJECTS[0].name)} →</button>`);
+  const hero=`<section class="hero3"><div>
+      <div class="eyebrow3">${hello}</div><h1>${heroTitle}</h1><p>${heroSub}</p>${heroBtn}
+    </div>${ORB_HTML}</section>`;
+
+  const tile=(ic,g,c,numHtml,lbl,click,extra)=>`<div class="stat-tile ${click?'clickable':''}" ${click?`onclick="${click}"`:""} style="--g:${g};--c:${c}">
+      <div class="st-ic">${icon(ic)}</div><div class="st-num">${numHtml}</div><div class="st-lbl">${lbl}</div>${extra||""}</div>`;
+  const pct=totalN?studiedN/totalN:0;
+  const tiles=`<div class="stat-row">
+    ${tile("flame","linear-gradient(135deg,#ffb547,#ff7a59)","rgba(255,140,70,.8)",`<span id="st-streak">${STREAK.current||0}</span><small>days</small>`,"Study streak","")}
+    ${tile("repeat","linear-gradient(135deg,#4f8cff,#5b7cff)","rgba(91,124,255,.8)",`<span id="st-review">${STREAK.review_due||0}</span><small>cards</small>`,"Due for review today","go('#/review')")}
+    ${tile("check","linear-gradient(135deg,#3ff0b0,#13b67d)","rgba(52,227,164,.8)",`${studiedN}<small>/ ${totalN}</small>`,"Chapters studied","",`<div class="st-ring">${ringSVG(pct,"#3ff0b0","#38d5ff",Math.round(pct*100)+"%")}</div>`)}
+    ${tile("cal","linear-gradient(135deg,#ff7ab8,#ff5c7a)","rgba(255,92,122,.8)",ne?`${ne.n}<small>days</small>`:"–",ne?`Until ${esc(ne.s.name)} exam`:"No exam date set",ne?`go('#/subject/${ne.s.id}')`:"")}
+  </div>`;
+
+  const cards=SUBJECTS.map((s,i)=>{
+    const studyS=STUDY?STUDY.subjects.find(x=>x.subject===s.name):null;
+    const inScope=s.chapters.filter(c=>c.in_scope!==0);
+    const st=studyS?studyS.chapters.filter(c=>c.studied).length:0;
+    const sheets=sheetCountFor(s.name);
+    const files=s.chapters.reduce((n,c)=>n+(c.materials?c.materials.length:0),0);
+    const prog=inScope.length?Math.round(sheets/inScope.length*100):0;
+    const p2=inScope.length?st/inScope.length:0;
+    const n=daysLeft(s.exam_date);
+    const [c1,c2]=SUBJ_GRADS[i%SUBJ_GRADS.length];
+    const examTxt=s.exam_date
+      ? `<div class="sc-exam" style="color:${n<0?'var(--muted)':(n<=7?'var(--rose)':'var(--amber)')}">${fmtExamDate(s.exam_date)}${n!=null&&n>=0?` · in ${n}d`:''}</div>`
+      : `<div class="sc-exam" style="color:var(--muted)">No exam date yet</div>`;
+    const pending=s.dirty?`<div class="sc-pending">● Changes pending, open to apply</div>`:"";
+    return `<button class="subj-card" onclick="go('#/subject/${s.id}')" style="--sg:linear-gradient(135deg,${c1},${c2});--sc:${c2}">
+      <div class="sc-ring">${ringSVG(p2,c1,c2,Math.round(p2*100)+"%")}</div>
+      <div class="sc-top3"><div class="sc-badge">${esc((s.name||"?").trim().charAt(0).toUpperCase())}</div>
+        <div><div class="sc-name">${esc(s.name)}</div><div class="sc-lvl">${esc(s.level||'')}${s.level?' · ':''}${inScope.length} chapters</div></div></div>
+      <div class="sc-metrics"><span><b>${files}</b> files</span><span><b>${sheets}</b> sheets</span><span><b>${st}</b> studied</span></div>
+      <div class="sc-prog"><i style="width:${prog}%"></i></div>
+      ${examTxt}${pending}
+    </button>`;
+  }).join("");
+  let recentHtml="";
+  if(RECENT.length){
+    recentHtml=`<div class="section-h">Jump back in</div><div class="recent-row">`+
+      RECENT.map(r=>`<button class="recent-chip" onclick="go('#/study/${r.cid}')"><b>${esc(r.chapter)}</b><small>${esc(r.subject)}</small></button>`).join("")+`</div>`;
+  }
+  work.innerHTML=`${hero}${tiles}<div class="section-h">Your subjects</div><div class="subj-grid">${cards}</div>${recentHtml}`;
+}
+
+/* ============================ STUDY SHEETS (index) ============================ */
+/* ============================ PDF downloads ============================
+   Every PDF is built on the server from what already exists (sheets, quizzes, missed
+   questions, saved exams): no AI calls, no cost. */
+async function downloadPdf(url, btn, busyLabel, body){
+  const label = btn ? btn.innerHTML : "";
+  if(btn){ btn.disabled = true; btn.innerHTML = busyLabel || "Building PDF…"; }
+  try{
+    const r = await fetch(url, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {});
+    if(!r.ok){
+      let msg = "Could not build the PDF.";
+      try{ msg = (await r.json()).error || msg; }catch(e){}
+      toast(msg); return false;
+    }
+    const blob = await r.blob();
+    const m = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = m ? m[1] : "StudyBridge.pdf";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    toast("PDF downloaded");
+    return true;
+  }catch(e){ toast("Could not build the PDF."); return false; }
+  finally{ if(btn){ btn.disabled = false; btn.innerHTML = label; } }
+}
+function downloadBook(sid, btn){ return downloadPdf(`/api/book/${sid}`, btn, "Building book…"); }
+function downloadExamPdf(eid, btn){ return downloadPdf(`/api/exam-pdf/${eid}`, btn, "Building…"); }
+function downloadChapterSet(cid, btn){
+  const c = findSheet(cid); if(!c) return;
+  return downloadPdf("/api/problem-set", btn, "Building…",
+    {subject_id:c.subject_id, chapter_ids:[cid], sources:["practice","quiz","missed"], answer_key:true, shuffle:false});
+}
+
+/* ---------- Print & PDF page ---------- */
+let PDF_OPT = null;   // {sid, data, chapters:Set, sources:Set, answer_key, shuffle}
+async function renderPdf(sid){
+  const work = document.getElementById("work");
+  const subs = (STUDY && STUDY.subjects) ? STUDY.subjects : [];
+  if(!subs.length){
+    work.innerHTML = `<h1 class="page-h">Print &amp; PDF</h1>
+      <div class="empty2"><div class="big">Nothing to print yet</div>
+      Build study sheets for a subject first, then come back here for a study book or a problem set.
+      <div style="margin-top:14px"><button class="btn-primary2" onclick="go('#/new')">＋ New subject</button></div></div>`;
+    return;
+  }
+  if(!sid || !subs.find(s=>s.subject_id===sid)) sid = subs[0].subject_id;
+  const pills = subs.length > 1 ? `<div class="pdf-pills">${subs.map(s=>
+      `<button class="pdf-pill ${s.subject_id===sid?'on':''}" onclick="go('#/pdf/${s.subject_id}')">${esc(s.subject)}</button>`).join("")}</div>` : "";
+  work.innerHTML = `<h1 class="page-h">Print &amp; PDF</h1>
+    <p class="page-sub">Printable files made from what you've already built. Free: no AI, no cost.</p>
+    ${pills}
+    <div id="pdf-body"><div class="hint"><span class="spin"></span> Loading…</div></div>`;
+  let data;
+  try{ data = await apiGet(`/api/problem-set/options?subject_id=${sid}`); }
+  catch(e){ document.getElementById("pdf-body").innerHTML = `<div class="callout error">Couldn't load this subject.</div>`; return; }
+  const withAny = data.chapters.filter(c=>c.practice+c.quiz+c.missed>0);
+  PDF_OPT = {sid, data, chapters:new Set(withAny.map(c=>c.id)),
+             sources:new Set(["practice","quiz","missed"]), answer_key:true, shuffle:false};
+  const nSheets = (subs.find(s=>s.subject_id===sid)||{chapters:[]}).chapters.length;
+  const tot = k => data.chapters.reduce((a,c)=>a+c[k],0);
+  const chRows = data.chapters.map((c,i)=>{
+    const n = c.practice + c.quiz + c.missed;
+    return `<label class="pdf-ch ${n?'':'off'}"><input type="checkbox" ${n?'checked':''} ${n?'':'disabled'} onchange="pdfToggle('ch',${c.id},this.checked)">
+      <span class="pdf-ch-name">${i+1}. ${esc(c.name)}</span>
+      <span class="pdf-ch-n">${n ? n+' problem'+(n===1?'':'s') : 'none yet'}</span></label>`;
+  }).join("");
+  const src = (k,label,hint)=>{ const n=tot(k);
+    return `<label class="pdf-src ${n?'':'off'}"><input type="checkbox" ${n?'checked':''} ${n?'':'disabled'} onchange="pdfToggle('src','${k}',this.checked)">
+      <span><b>${label}</b> <em>${n}</em><small>${hint}</small></span></label>`; };
+  const exams = data.exams.length ? data.exams.map(e=>`<div class="pdf-exam">
+      <span>${esc(e.title||'Practice exam')}</span>
+      <button class="btn-line2" onclick="downloadExamPdf(${e.id}, this)">Download PDF</button></div>`).join("")
+    : `<div class="hint">No practice exams yet. Make one from the subject page (“Practice exam”), then print it here.</div>`;
+  document.getElementById("pdf-body").innerHTML = `
+    <div class="pdf-grid">
+      <section class="pdf-card">
+        <div class="pdf-card-h"><div class="pdf-ic pdf-ic-book">${icon("book")}</div>
+          <div><h3>Study Book</h3><p>Every chapter in one book: cover, contents, notes, practice problems, answer key and an ending page.</p></div></div>
+        <ul class="pdf-facts"><li><b>${nSheets}</b> chapters</li><li><b>${tot('practice')}</b> practice problems</li><li>Answer key at the back</li></ul>
+        <button class="btn-primary2 pdf-go" onclick="downloadBook(${sid}, this)">Download Study Book</button>
+      </section>
+      <section class="pdf-card">
+        <div class="pdf-card-h"><div class="pdf-ic pdf-ic-set">${icon("pencil")}</div>
+          <div><h3>Problem Set</h3><p>A worksheet to print and solve on paper, with space to write and a name / score box.</p></div></div>
+        <div class="pdf-lbl">Chapters</div>
+        <div class="pdf-chs">${chRows}</div>
+        <div class="pdf-lbl">Include</div>
+        <div class="pdf-srcs">
+          ${src('practice','Practice problems','from your study sheets')}
+          ${src('quiz','Quiz questions','multiple choice you already took')}
+          ${src('missed','Questions you missed','your weak spots')}
+        </div>
+        <div class="pdf-opts">
+          <label><input type="checkbox" checked onchange="PDF_OPT.answer_key=this.checked"> Answer key at the back</label>
+          <label><input type="checkbox" onchange="PDF_OPT.shuffle=this.checked"> Shuffle problems</label>
+        </div>
+        <button class="btn-primary2 pdf-go" id="pdf-set-btn" onclick="makeProblemSet(this)">Make Problem Set</button>
+      </section>
+    </div>
+    <div class="section-h" style="margin-top:26px">Practice exams</div>
+    <div class="card2">${exams}</div>`;
+  pdfCount();
+}
+function pdfToggle(kind, key, on){
+  const set = kind==="ch" ? PDF_OPT.chapters : PDF_OPT.sources;
+  on ? set.add(key) : set.delete(key);
+  pdfCount();
+}
+function pdfCount(){
+  const n = PDF_OPT.data.chapters.filter(c=>PDF_OPT.chapters.has(c.id))
+    .reduce((a,c)=>a+[...PDF_OPT.sources].reduce((b,k)=>b+(c[k]||0),0),0);
+  const btn = document.getElementById("pdf-set-btn");
+  if(btn){ btn.disabled = !n; btn.innerHTML = n ? `Make Problem Set · ${n} problem${n===1?'':'s'}` : "Pick at least one chapter and source"; }
+}
+function makeProblemSet(btn){
+  return downloadPdf("/api/problem-set", btn, "Building problem set…", {
+    subject_id:PDF_OPT.sid, chapter_ids:[...PDF_OPT.chapters], sources:[...PDF_OPT.sources],
+    answer_key:PDF_OPT.answer_key, shuffle:PDF_OPT.shuffle});
+}
+
+function renderSheets(){
+  const work=document.getElementById("work");
+  if(!STUDY || !STUDY.subjects.length){
+    work.innerHTML=`<h1 class="page-h">Study sheets</h1>
+      <div class="empty2"><div class="big">No sheets yet</div>
+      Add a subject and press Generate to build your study sheets.
+      <div style="margin-top:14px"><button class="btn-primary2" onclick="go('#/new')">＋ New subject</button></div></div>`;
+    return;
+  }
+  const blocks=STUDY.subjects.map(s=>{
+    const chips=s.chapters.map(c=>{
+      const pl=(c.plan&&c.plan.length)?`<span class="cc-pill day">🗓️ ${c.plan.map(p=>fmtDay(p.day)).join(", ")}</span>`:`<span class="cc-pill">unscheduled</span>`;
+      return `<button class="chap-card" onclick="go('#/study/${c.id}')">
+        <div class="cc-name">${esc(c.name)}</div>
+        <div class="cc-tags">${c.ai_generated?'<span class="cc-pill ai">AI</span>':''}${c.studied?'<span class="cc-pill studied">✓ studied</span>':''}${pl}</div>
+      </button>`;
+    }).join("");
+    return `<div class="section-h section-h-row"><span>${esc(s.subject)}</span><button class="tool-btn" onclick="downloadBook(${s.subject_id}, this)">📘 Study Book PDF</button></div><div class="chap-grid">${chips}</div>`;
+  }).join("");
+  work.innerHTML=`<h1 class="page-h">Study sheets</h1>
+    <p class="page-sub">Open any chapter to read its sheet, quiz yourself, or use flashcards.</p>${blocks}`;
+}
+
+/* ============================ profile: grade ============================ */
+async function editGrade(){
+  const cur=(document.getElementById("u-grade").textContent.match(/Grade (\w+)/)||[])[1]||"";
+  const v=prompt("Your grade (K, or 1–12):", cur);
+  if(v===null) return;
+  const g=v.trim().toUpperCase()==="K"?"0":v.trim();
+  const r=await apiPostJson("/api/user/grade",{grade:g});
+  if(r.ok){ document.getElementById("u-grade").textContent=`Grade ${g==="0"?"K":g} · edit`; toast("Grade updated."); }
+}
+
+/* ============================ SUBJECT SPACE ============================ */
+function renderSubject(sid){
+  const work=document.getElementById("work");
+  const s=SUBJECTS.find(x=>x.id===sid);
+  if(!s){ go('#/home'); return; }
+  const sheets=sheetCountFor(s.name);
+  const files=s.chapters.reduce((n,c)=>n+(c.materials?c.materials.length:0),0);
+  const studyS=STUDY?STUDY.subjects.find(x=>x.subject===s.name):null;
+  const studied=studyS?studyS.chapters.filter(c=>c.studied).length:0;
+  const examN=daysLeft(s.exam_date);
+  const dirty=!!s.dirty;
+  const hasSheets=sheets>0;
+
+  // plan day per chapter (from study-data)
+  const planByChap={}; if(studyS) studyS.chapters.forEach(c=>{ if(c.plan&&c.plan.length) planByChap[c.id]=c.plan; });
+
+  // ---- chapters as a vertical "path" (Duolingo-style progress trail) ----
+  const inScope=s.chapters.filter(c=>c.in_scope!==0);
+  // "current" = first chapter that has a sheet but isn't studied yet (the next thing to do)
+  let currentIdx=-1;
+  inScope.forEach((c,i)=>{
+    const sh=studyS?studyS.chapters.find(x=>x.id===c.id):null;
+    if(currentIdx<0 && sh && !sh.studied) currentIdx=i;
+  });
+  const chapPath=inScope.map((c,i)=>{
+    const sh=studyS?studyS.chapters.find(x=>x.id===c.id):null;
+    let state, ico;
+    if(!sh){ state="locked"; ico="○"; }
+    else if(sh.studied){ state="done"; ico="✓"; }
+    else if(i===currentIdx){ state="current"; ico="▶"; }
+    else { state="ready"; ico="📖"; }
+    const off=Math.round(Math.sin(i*0.9)*70);              // gentle zigzag
+    const w=c.weight||2;
+    const click=sh?`onclick="go('#/study/${c.id}')"`:`onclick="toast('Press Apply in step 3 to build this sheet')"`;
+    const stars=[1,2,3].map(n=>`<span class="pstar ${n<=w?'on':''}" title="Importance" onclick="event.stopPropagation();setChapterWeight(${c.id},${n})">★</span>`).join("");
+    return `<div class="path-row" style="transform:translateX(${off}px)">
+      ${state==="current"?`<div class="start-flag">START</div>`:""}
+      ${cylNode(state,ico,click,i)}
+      <div class="node-label">${esc(c.name)}</div>
+      <div class="node-stars"><span class="stars-lbl">Difficulty</span>${stars}</div>
+    </div>`;
+  }).join("");
+  const progPct = inScope.length ? Math.round(100*studied/inScope.length) : 0;
+  const chapPathWrap = inScope.length
+    ? `<div class="path-progress"><div class="path-progress-bar"><span style="width:${progPct}%"></span></div>
+         <span class="path-progress-txt">${studied} / ${inScope.length} studied</span></div>
+       <div class="chap-path">${chapPath}</div>`
+    : `<div class="hint" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">No chapters yet — this is the first step.<button class="btn-primary2" onclick="editSubject(${sid})">Set up chapters →</button></div>`;
+
+  // ---- main workflow: 1) add files  ->  2) build sheets & plan ----
+  const step1 = files>0
+    ? `<div class="wf-done">
+         <div class="wf-num done">✓</div>
+         <div class="wf-body"><div class="wf-title">${files} file(s) added</div>
+           <label class="wf-link">＋ Add more files<input type="file" id="su-files-${s.id}" multiple style="display:none" onchange="uploadToSubject(${s.id})"></label></div>
+       </div>`
+    : `<label class="wf-drop" id="dz-${s.id}" ondrop="onSubjectDrop(event,${s.id})" ondragover="onSubjectDragOver(event,${s.id})" ondragleave="onSubjectDragLeave(${s.id})">
+         <input type="file" id="su-files-${s.id}" multiple style="display:none" onchange="uploadToSubject(${s.id})">
+         <div class="wf-body"><div class="wf-title"><span class="step-tag">Step 2</span> Add your class files <span class="wf-opt">optional</span></div>
+           <div class="wf-sub">${hasSheets&&!dirty?'Got more notes or a new handout? Add it here, then Rebuild to sharpen your sheets.':'Drag &amp; drop here, or click to choose — PDFs, slides, photos, or a .zip'}</div></div>
+         ${hasSheets&&!dirty?`<span class="doodle-arrow-wrap"><span class="arrow-num">+</span>${doodleArrow(false)}</span>`:''}
+         <div class="wf-cta">Choose files</div>
+       </label>`;
+
+  const canBuild = s.chapters.length>0;
+  const step2 = `<button class="wf-build ${dirty?'pending':''} ${!canBuild?'disabled':''}" id="wf-build-${sid}" ${canBuild?`onclick="applyChanges(${sid})"`:'disabled'}>
+      <div class="wf-body"><div class="wf-title"><span class="step-tag light">Step 3</span> ${dirty?'Build sheets &amp; plan — apply changes':(hasSheets?'Rebuild sheets &amp; plan':'Build study sheets &amp; plan')}</div>
+        <div class="wf-sub">${dirty?'No files needed — AI writes any chapter you didn\'t upload for':(hasSheets?'Up to date':'Works with or without files — AI fills in the rest')}</div></div>
+      ${canBuild&&(dirty||!hasSheets)?`<span class="doodle-arrow-wrap"><span class="arrow-num light">3</span>${doodleArrow(true)}</span>`:''}
+      <div class="wf-cta">${dirty?'Apply':(hasSheets?'Rebuild':'Build')}</div>
+    </button>`;
+
+  work.innerHTML=`
+    <div class="subj-head">
+      <div class="crumb" onclick="go('#/home')">← All subjects</div>
+      <div class="subj-head-top">
+        <h1>${esc(s.name)} ${s.level?`<span style="font-size:14px;color:var(--muted)">· ${esc(s.level)}</span>`:''}</h1>
+      </div>
+      <div class="metrics">
+        <span><b>${s.chapters.filter(c=>c.in_scope!==0).length}</b> chapters</span>
+        <span><b>${files}</b> files</span>
+        <span><b>${sheets}</b> sheets</span>
+        <span><b>${studied}</b> studied</span>
+      </div>
+      <div class="exam-inline ${!s.exam_date?'needs':''}">
+        <span class="step-tag">Step 1</span>
+        <label>📅 Exam date</label>
+        ${!s.exam_date?`<span class="start-here-wrap"><span class="arrow-num">1</span>${doodleArrow(false)}</span>`:''}
+        <button type="button" class="exam-date-btn ${s.exam_date?'set':''}" onclick="openExamPicker(${sid})">
+          ${s.exam_date?fmtExamDate(s.exam_date):'Set exam date'}
+        </button>
+        <input type="date" id="exam-input-${sid}" value="${esc(s.exam_date||'')}"
+          style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
+          onchange="saveExamDate(${sid}, this.value)">
+        ${s.exam_date?`<span class="exam-when ${examN!=null&&examN<=7?'soon':''}">${examN!=null&&examN>=0?`in ${examN} days`:'past'}</span>
+          <button type="button" class="exam-clear" onclick="saveExamDate(${sid}, '')" title="Clear">✕</button>`:`<span class="hint">so we can build your plan</span>`}
+      </div>
+      ${dirty?`<div class="pending-note" id="pending-note-${sid}">⚠️ Changes not applied yet — press <b>Apply</b> in step 3 to rebuild.</div>`:""}
+      <div class="workflow">
+        ${step1}
+        <div class="wf-arrow">→</div>
+        ${step2}
+      </div>
+      <div id="su-prog-${s.id}"></div>
+    </div>
+    <div class="section-h section-h-row">
+      <span>Chapters</span>
+      <button class="tool-btn" onclick="editSubject(${s.id})">✏️ Edit chapters</button>
+    </div>
+    ${chapPathWrap}
+    <div class="book-card">
+      <div class="book-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></svg></div>
+      <div class="book-txt"><b>Print &amp; PDF</b><span>A study book of every chapter, or a problem set to solve on paper. Free: uses what you've already built, no AI.</span></div>
+      <div class="book-btns">
+        <button class="btn-primary2 book-btn" onclick="downloadBook(${s.id}, this)">Study Book</button>
+        <button class="btn-line2 book-btn2" onclick="go('#/pdf/${s.id}')">Problem Set…</button>
+      </div>
+    </div>
+    <div class="section-h section-h-row">
+      <span>Practice exams</span>
+      <button class="tool-btn" onclick="genMockExam(${s.id})">📝 Practice exam</button>
+    </div>
+    <div id="exam-list-${s.id}" class="card2"><span class="hint">Loading…</span></div>`;
+  loadExams(sid);
+  resumeGenIfRunning(sid);
+}
+
+function openExamPicker(sid){
+  const input=document.getElementById("exam-input-"+sid);
+  if(!input) return;
+  if(input.showPicker){ try{ input.showPicker(); return; }catch(e){} }
+  // fallback: temporarily make it interactable and focus
+  input.style.position="static"; input.style.width="auto"; input.style.height="auto";
+  input.style.opacity="1"; input.style.pointerEvents="auto"; input.focus(); input.click();
+}
+async function saveExamDate(sid, value){
+  const s=SUBJECTS.find(x=>x.id===sid); if(!s) return;
+  const fd=new FormData(); fd.append("subject_id",sid); fd.append("name",s.name);
+  fd.append("exam_date",value); fd.append("exam_scope",s.exam_scope||"ALL"); fd.append("level",s.level||"");
+  await apiPostForm("/api/subject",fd);
+  await loadAll(); await route();   // re-render -> shows pending banner
+}
+
+async function applyChanges(sid){
+  await generateNow();   // rebuilds sheets (cache-aware) + plan, clears dirty on success
+}
+
+/* Chapter setup is a small step-by-step wizard so first-timers aren't dropped into a blank
+   box: step 1 = pick a method (type / AI / file), step 2 = do that method, all three funnel
+   into the same "review the chapter list, then save" screen. */
+function editSubject(sid){
+  const s=SUBJECTS.find(x=>x.id===sid); if(!s) return;
+  window._ED={ sid, method:null, level:s.level||"" };
+  const old=document.getElementById("edit-panel"); if(old) old.remove();
+  const work=document.getElementById("work");
+  work.insertAdjacentHTML("afterbegin",`<div class="banner" id="edit-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b>Set up chapters · ${esc(s.name)}</b>
+      <button class="btn-line2" onclick="document.getElementById('edit-panel').remove()">Close</button></div>
+    <div id="ed-body"></div></div>`);
+  edRenderChooser(sid);
+  window.scrollTo(0,0);
+}
+/* step 1 — level + method chooser */
+function edRenderChooser(sid){
+  const s=SUBJECTS.find(x=>x.id===sid); if(!s) return;
+  window._ED.method=null;
+  const card=(m,ic,title,desc)=>`<div class="ed-method" id="edm-${m}" onclick="edPick('${m}')">
+      <div class="edm-ic">${ic}</div>
+      <div><div class="edm-t">${title}</div><div class="edm-d">${desc}</div></div></div>`;
+  document.getElementById("ed-body").innerHTML=`
+    <div class="hint" style="margin:6px 0 10px">Exam date is set above on the subject page.</div>
+    <div class="field"><label>Level</label>
+      <select id="ed-level">
+        <option value="" ${!s.level?"selected":""}>—</option>
+        <option ${s.level==="Standard"?"selected":""}>Standard</option>
+        <option ${s.level==="Honors"?"selected":""}>Honors</option>
+        <option ${s.level==="AP"?"selected":""}>AP</option>
+      </select></div>
+    <label style="font-weight:600;font-size:13px">How do you want to add chapters?</label>
+    <div class="ed-methods">
+      ${card('type','✍️','Type them myself','Enter the chapters, one per line.')}
+      ${card('ai','✨','Let AI create them','AI suggests chapters for this subject.')}
+      ${card('file','📄','Upload a syllabus file','We read the chapter list out of your file.')}
+    </div>
+    <button class="btn-primary2" id="ed-next" disabled onclick="edNext()">Next →</button>`;
+}
+function edPick(m){
+  window._ED.method=m;
+  document.querySelectorAll(".ed-method").forEach(e=>e.classList.remove("sel"));
+  const el=document.getElementById("edm-"+m); if(el) el.classList.add("sel");
+  const nx=document.getElementById("ed-next"); if(nx) nx.disabled=false;
+}
+function edNext(){
+  const lv=document.getElementById("ed-level"); if(lv) window._ED.level=lv.value;
+  const m=window._ED.method;
+  if(m==="type"){
+    const s=SUBJECTS.find(x=>x.id===window._ED.sid);
+    edShowReview(s.chapters.map(c=>({name:c.name, scope:c.in_scope!==0})), "");
+  } else if(m==="ai"){ edStepAI(); }
+  else if(m==="file"){ edStepFile(); }
+}
+/* step 2a — AI generate (review before saving) */
+function edStepAI(){
+  const s=SUBJECTS.find(x=>x.id===window._ED.sid);
+  const lv=window._ED.level||s.level;
+  document.getElementById("ed-body").innerHTML=`
+    <button class="ed-back" onclick="edRenderChooser(window._ED.sid)">← Back</button>
+    <p class="hint">AI will suggest chapters for <b>${esc(s.name)}</b>${lv?` (${esc(lv)})`:""} based on your grade. You can edit them before saving.</p>
+    <div id="ed-ai-area"><button class="btn-primary2" onclick="edGenAI(this)">✨ Generate chapters</button></div>`;
+}
+async function edGenAI(btn){
+  const s=SUBJECTS.find(x=>x.id===window._ED.sid);
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Generating…';
+  const fd=new FormData(); fd.append("name",s.name); fd.append("exam_scope",s.exam_scope||"");
+  let r; try{ r=await apiPostForm("/api/syllabus/preview",fd); }
+  catch(e){ toast("AI request failed."); btn.disabled=false; btn.textContent="✨ Generate chapters"; return; }
+  if(r.error||!r.chapters||!r.chapters.length){ toast(r.error||"AI could not generate chapters."); btn.disabled=false; btn.textContent="✨ Generate chapters"; return; }
+  edShowReview(r.chapters.map(n=>({name:n, scope:true})), "AI suggested these — edit if needed.");
+}
+/* step 2b — syllabus file (review before saving) */
+function edStepFile(){
+  const s=SUBJECTS.find(x=>x.id===window._ED.sid);
+  document.getElementById("ed-body").innerHTML=`
+    <button class="ed-back" onclick="edRenderChooser(window._ED.sid)">← Back</button>
+    <p class="hint">Upload your syllabus (PDF, Word, image, .zip…). We'll pull the chapters out of it.</p>
+    <label class="dropzone2"><div class="big">Click to choose a syllabus file</div>
+      <div>We'll extract the chapter list</div>
+      <input type="file" id="ed-file" style="display:none" onchange="edFromFile(this)"></label>
+    <div id="ed-file-msg" style="margin-top:10px"></div>`;
+}
+async function edFromFile(input){
+  if(!input.files.length) return;
+  const s=SUBJECTS.find(x=>x.id===window._ED.sid);
+  const msg=document.getElementById("ed-file-msg");
+  msg.innerHTML='<div class="hint"><span class="spin"></span> Reading the file…</div>';
+  const fd=new FormData(); fd.append("name",s.name); fd.append("file",input.files[0]); input.value="";
+  let r; try{ r=await apiPostForm("/api/syllabus/from-file",fd); }
+  catch(e){ msg.innerHTML='<div class="banner">Could not read that file.</div>'; return; }
+  if(r.error||!r.chapters||!r.chapters.length){ msg.innerHTML=`<div class="banner">${esc(r.error||"No chapters found — try typing them instead.")}</div>`; return; }
+  edShowReview(r.chapters.map(n=>({name:n, scope:true})), "Pulled from your file — edit if needed.");
+}
+/* shared final step — review the chapter list, then save */
+/* Final step — chapters shown as slots (one card each) with an "on this exam?" checkbox,
+   instead of a raw text box. Unchecked slots are saved as out-of-scope (no sheet, no plan days). */
+function edSlotRow(name, scope){
+  return `<div class="slot" data-slot>
+    <label class="slot-chk" title="On this exam"><input type="checkbox" class="slot-scope" ${scope?"checked":""}></label>
+    <input type="text" class="slot-name" value="${esc(name||"")}" placeholder="Chapter name">
+    <button type="button" class="slot-x" title="Remove" onclick="this.closest('[data-slot]').remove()">×</button>
+  </div>`;
+}
+function edShowReview(rows, note){
+  rows = (rows&&rows.length) ? rows : [{name:"",scope:true}];
+  document.getElementById("ed-body").innerHTML=`
+    <button class="ed-back" onclick="edRenderChooser(window._ED.sid)">← Back</button>
+    <div class="slot-head"><span>Chapters — check the ones on this exam</span></div>
+    <div id="ed-slots">${rows.map(r=>edSlotRow(r.name, r.scope!==false)).join("")}</div>
+    <button type="button" class="slot-add" onclick="edAddSlot()">＋ Add chapter</button>
+    <div class="hint" style="margin:8px 0 12px">${note?esc(note)+" ":""}Uncheck any unit that's <b>not</b> on this exam — it won't get a sheet or take up plan days.</div>
+    <button class="btn-primary2" onclick="edSave()">Save chapters</button>`;
+}
+function edAddSlot(){
+  const host=document.getElementById("ed-slots");
+  host.insertAdjacentHTML("beforeend", edSlotRow("", true));
+  const names=host.querySelectorAll(".slot-name"); const last=names[names.length-1]; if(last) last.focus();
+}
+async function edSave(){
+  const sid=window._ED.sid, s=SUBJECTS.find(x=>x.id===sid);
+  const names=[], scopes=[];
+  document.querySelectorAll("#ed-slots .slot").forEach(row=>{
+    const nm=(row.querySelector(".slot-name").value||"").trim();
+    if(!nm) return;
+    names.push(nm);
+    scopes.push(row.querySelector(".slot-scope").checked ? "1" : "0");
+  });
+  if(!names.length){ toast("Add at least one chapter."); return; }
+  const fd=new FormData(); fd.append("subject_id",sid); fd.append("name",s.name);
+  fd.append("exam_date",s.exam_date||""); fd.append("exam_scope",s.exam_scope||"ALL");
+  fd.append("level", window._ED.level!=null?window._ED.level:(s.level||""));
+  await apiPostForm("/api/subject",fd);
+  const f2=new FormData(); f2.append("subject_id",sid); f2.append("mode","user");
+  f2.append("chapters_text",names.join("\n")); f2.append("scopes",scopes.join(","));
+  await apiPostForm("/api/syllabus",f2);
+  await loadAll(); go('#/subject/'+sid); await route();
+  toast("Chapters saved.");
+}
+function changeBanner(sid,msg){
+  const b=document.getElementById("su-banner-"+sid);
+  if(b) b.innerHTML=`<div class="banner" style="margin-top:14px">${msg}</div>`;
+}
+
+function uploadToSubject(sid){
+  const input=document.getElementById("su-files-"+sid);
+  if(input && input.files.length) uploadFilesForSubject(sid, input.files);
+}
+async function uploadFilesForSubject(sid, fileList){
+  if(!fileList || !fileList.length) return;
+  const host=document.getElementById("su-prog-"+sid);
+  host.innerHTML=`<div class="prog" style="margin-top:14px">
+    <div class="prog-top"><span id="up-pct">0%</span><span class="hint" id="up-eta"></span></div>
+    <div class="prog-bar"><i id="up-bar"></i></div>
+    <div class="prog-msg" id="up-msg">Uploading…</div>
+    <div class="hint" id="up-now"></div></div>`;
+  const fd=new FormData(); for(const f of fileList) fd.append("files",f);
+  const inp=document.getElementById("su-files-"+sid); if(inp) inp.value="";
+  const setBar=p=>{const e=document.getElementById("up-bar");if(e)e.style.width=Math.round(p)+"%";const pe=document.getElementById("up-pct");if(pe)pe.textContent=Math.round(p)+"%";};
+  const setMsg=t=>{const e=document.getElementById("up-msg");if(e)e.textContent=t;};
+  const setNow=t=>{const e=document.getElementById("up-now");if(e)e.textContent=t;};
+  const setEta=t=>{const e=document.getElementById("up-eta");if(e)e.textContent=t;};
+  let polling=true;
+  async function poll(){ while(polling){ try{
+    const p=await(await fetch("/api/upload/progress")).json();
+    if(p.state==="preparing"){ setMsg(`Opening files… ${p.done}/${p.total}`); if(p.total) setBar(100*p.done/p.total); setNow(p.now||""); setEta(""); }
+    else if(p.state==="processing"){ setMsg(`Step 1/2 · Reading files — ${p.done}/${p.total}`); if(p.total) setBar(100*p.done/p.total);
+      setNow(p.now?("Reading: "+p.now):""); setEta(fmtEta(p.eta_sec)); }
+    else if(p.state==="matching"){ setMsg("Step 2/2 · Sorting files into chapters…"); setBar(100); setNow(""); setEta(""); }
+  }catch(e){} await new Promise(r=>setTimeout(r,700)); } }
+  let result=null;
+  await new Promise((res,rej)=>{ const xhr=new XMLHttpRequest(); xhr.open("POST","/api/upload");
+    xhr.upload.onprogress=e=>{ if(e.lengthComputable){ const p=100*e.loaded/e.total; setBar(p); setMsg(`Uploading… ${Math.round(p)}%`);
+      if(p>=100){ setMsg("Upload complete. Starting to read files…"); poll(); } } };
+    xhr.onload=()=>{ polling=false; try{ result=JSON.parse(xhr.responseText); }catch(e){} res(); };
+    xhr.onerror=()=>{ polling=false; rej(); }; xhr.send(fd);
+  }).catch(()=>{});
+  await loadAll();
+  go('#/subject/'+sid); await route();
+  renderUploadSummary(sid, result);
+}
+function renderUploadSummary(sid, r){
+  const host=document.getElementById("su-prog-"+sid);
+  if(!host || !r){ return; }
+  const s=r.summary||{added:0,excluded:0,warned:0,failed:0,duplicate:0};
+  // counts line
+  let parts=[`<b>✓ ${s.added} added</b>`];
+  if(s.duplicate) parts.push(`🔁 ${s.duplicate} duplicate`);
+  if(s.excluded) parts.push(`⏭️ ${s.excluded} excluded`);
+  if(s.warned) parts.push(`⚠️ ${s.warned} large`);
+  if(s.failed) parts.push(`❌ ${s.failed} failed`);
+  // per-chapter breakdown from matched labels ("Subject / Chapter")
+  const bySub={}; let unsorted=0;
+  (r.matched||[]).forEach(m=>{ if(m.label){ bySub[m.label]=(bySub[m.label]||0)+1; } else unsorted++; });
+  let bars="";
+  const entries=Object.entries(bySub);
+  if(entries.length){
+    const max=Math.max(...entries.map(([,v])=>v));
+    const rows=entries.map(([k,v])=>
+      `<div class="up-bar"><span class="up-name">${esc(k)}</span><span class="up-track"><i style="width:${Math.round(v/max*100)}%"></i></span><b>${v}</b></div>`).join("");
+    bars=`<details style="margin-top:8px"><summary class="up-bars-toggle">Show where files were sorted (${entries.length} chapters)</summary>
+      <div class="up-bars">${rows}</div></details>`;
+  }
+  let extra="";
+  if(unsorted) extra+=`<div class="hint" style="margin-top:6px">${unsorted} file(s) not sorted into a chapter yet.</div>`;
+  if(r.match_note) extra+=`<div class="hint" style="margin-top:6px">${esc(r.match_note)}</div>`;
+  const detailList=(arr,icon,label)=>{ if(!arr||!arr.length) return "";
+    const items=arr.slice(0,8).map(f=>`<li>${esc(f.file)}${f.reason?` — ${esc(f.reason)}`:""}</li>`).join("");
+    const more=arr.length>8?`<li>…and ${arr.length-8} more</li>`:"";
+    return `<details style="margin-top:6px"><summary class="hint" style="cursor:pointer">${icon} ${arr.length} ${label}</summary>
+      <ul style="margin:6px 0 0 18px;font-size:13px;color:var(--muted)">${items}${more}</ul></details>`; };
+  host.innerHTML=`<div class="up-summary">
+    <div class="up-counts">${parts.join(" · ")}</div>
+    ${bars}${extra}
+    ${detailList(r.duplicate,"🔁","duplicate (already uploaded)")}
+    ${detailList(r.excluded,"⏭️","excluded (can't become study text)")}
+    ${detailList(r.failed,"❌","couldn't be added")}
+  </div>`;
+}
+function onSubjectDrop(ev, sid){
+  ev.preventDefault();
+  const dz=document.getElementById("dz-"+sid); if(dz) dz.classList.remove("drag");
+  const files=ev.dataTransfer&&ev.dataTransfer.files; if(files&&files.length) uploadFilesForSubject(sid, files);
+}
+function onSubjectDragOver(ev, sid){ ev.preventDefault(); const dz=document.getElementById("dz-"+sid); if(dz) dz.classList.add("drag"); }
+function onSubjectDragLeave(sid){ const dz=document.getElementById("dz-"+sid); if(dz) dz.classList.remove("drag"); }
+
+/* practice exams */
+async function loadExams(sid){
+  const host=document.getElementById("exam-list-"+sid); if(!host) return;
+  try{ const all=(await apiGet("/api/mock-exam/list")).exams||[];
+    const mine=all.filter(e=>e.subject_id===sid);
+    host.innerHTML = mine.length
+      ? mine.map(e=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
+          <button class="btn-line2" onclick="openExam(${e.id})">${esc(e.title)}</button>
+          <span style="display:flex;gap:8px;align-items:center"><button class="btn-line2" onclick="downloadExamPdf(${e.id}, this)">PDF</button>
+          <button class="x-btn" onclick="delExam(${e.id},${sid})">&times;</button></span></div>`).join("")
+      : `<span class="hint">No practice exams yet. Press “Practice exam” above to generate a 40-question exam.</span>`;
+  }catch(e){ host.innerHTML=""; }
+}
+async function genMockExam(sid){
+  const host=document.getElementById("exam-list-"+sid);
+  if(host) host.innerHTML=`<span class="hint"><span class="spin"></span> Writing a 40-question exam…</span>`;
+  const r=await apiPostJson("/api/mock-exam/generate",{subject_id:sid});
+  if(!r.ok){ toast(r.error||"Couldn't generate exam"); loadExams(sid); return; }
+  toast("Practice exam ready."); await loadExams(sid); openExam(r.id);
+}
+async function delExam(id,sid){ if(!confirm("Delete this practice exam?")) return; await fetch("/api/mock-exam/"+id,{method:"DELETE"}); loadExams(sid); }
+async function openExam(id){
+  const e=await apiGet("/api/mock-exam/"+id);
+  const work=document.getElementById("work");
+  work.innerHTML=`<div class="crumb" style="cursor:pointer;color:var(--muted)" onclick="history.back()">← Back</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 14px">
+      <h1 class="page-h">${esc(e.title)}</h1>
+      <div><button class="btn-line2" onclick="toggleAnswers(this)">Show answers</button>
+      <button class="btn-line2" onclick="window.print()">🖨 Print</button></div></div>
+    <div class="sheet workbook" id="exam-body"></div>`;
+  const body=document.getElementById("exam-body"); body.innerHTML=e.html;
+  const ak=[...body.querySelectorAll("h2")].find(h=>/answer key/i.test(h.textContent));
+  if(ak){ let n=ak; while(n){ n.classList.add("answer-key"); n=n.nextElementSibling; } }
+  renderMermaid(body);
+}
+function toggleAnswers(btn){ const on=document.body.classList.toggle("show-answers"); btn.textContent=on?"Hide answers":"Show answers"; }
+
+/* ============================ STUDY (read) ============================ */
+const SEC_ICONS={1:"📘",2:"🔑",3:"📖",4:"🔗",5:"💡",6:"⚠️",7:"⭐",8:"🎯",9:"✏️",10:"✅",11:"⏱️"};
+let CUR_CH=null;
+function decorateSheet(html,forPrint){
+  const tmp=document.createElement("div"); tmp.innerHTML=html;
+  const sheet=document.createElement("div"); sheet.className="sheet workbook"; let cur=null;
+  const flush=()=>{ if(cur){ sheet.appendChild(cur); cur=null; } };
+  [...tmp.childNodes].forEach(node=>{
+    if(node.nodeType===1&&node.tagName==="H1"){ flush(); node.classList.add("sheet-title"); sheet.appendChild(node); return; }
+    if(node.nodeType===1&&node.tagName==="H2"){ flush(); const m=(node.textContent||"").match(/^\s*(\d+)/); const num=m?parseInt(m[1]):0;
+      cur=document.createElement("section"); cur.className="sheet-sec sec-"+num;
+      const ic=document.createElement("span"); ic.className="sec-ic"; ic.textContent=SEC_ICONS[num]||"•";
+      node.insertBefore(ic,node.firstChild); cur.appendChild(node);
+    } else { if(!cur){ cur=document.createElement("section"); cur.className="sheet-sec"; } cur.appendChild(node); }
+  });
+  flush();
+  const ans=sheet.querySelector(".sec-10");
+  if(ans&&!forPrint){ const bd=document.createElement("div"); bd.className="answers-body";
+    [...ans.children].forEach(ch=>{ if(ch.tagName!=="H2") bd.appendChild(ch); });
+    const b=document.createElement("button"); b.className="btn-line2 reveal-btn no-print"; b.textContent="Reveal answers";
+    b.onclick=()=>{ bd.classList.toggle("open"); b.textContent=bd.classList.contains("open")?"Hide answers":"Reveal answers"; };
+    ans.appendChild(b); ans.appendChild(bd); }
+  return sheet;
+}
+async function renderStudy(cid){
+  const work=document.getElementById("work");
+  const c=findSheet(cid);
+  if(!c){ work.innerHTML=`<div class="empty2"><div class="big">No sheet for this chapter yet</div>Generate sheets first.</div>`; return; }
+  CUR_CH=cid;
+  fetch("/api/recent/touch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chapter_id:cid})});
+  const subj=STUDY.subjects.find(s=>s.subject===c.subject);
+  const opts=subj.chapters.map(x=>`<option value="${x.id}" ${x.id===cid?"selected":""}>${esc(x.name)}</option>`).join("");
+  const idx=subj.chapters.findIndex(x=>x.id===cid);
+  const prev=idx>0?subj.chapters[idx-1].id:null, next=idx<subj.chapters.length-1?subj.chapters[idx+1].id:null;
+  const stamp=c.ai_generated?`<div class="banner ai-note">⚠️ AI-written from standard-curriculum knowledge (no files for this chapter), so it may differ from your class.</div>`:"";
+  const sched=(c.plan&&c.plan.length)?`<div class="banner">🗓️ Study day: ${c.plan.map(p=>fmtDay(p.day)).join(", ")} — ${esc(c.plan[0].task||"")}</div>`:"";
+  work.innerHTML=`
+    <div class="study-top">
+      <button class="study-back" onclick="go('#/subject/${c.subject_id}')">🗺️ Back to ${esc(c.subject)} map</button>
+      <button class="study-back map" onclick="go('#/plan')">📅 Study plan</button>
+    </div>
+    <div class="study-headrow">
+      <div class="study-pick">
+        <label class="study-lbl">Chapter</label>
+        <select class="chap-select" onchange="go('#/study/'+this.value)">${opts}</select>
+        <button class="btn-line2" ${prev?`onclick="go('#/study/${prev}')"`:"disabled"}>‹ Previous</button>
+        <button class="btn-line2" ${next?`onclick="go('#/study/${next}')"`:"disabled"}>Next ›</button>
+      </div>
+    </div>
+    ${stamp}${sched}
+    <div class="study-steps">
+      <span class="ss"><b>1</b> Read the sheet</span><span class="ss-arrow">→</span>
+      <span class="ss"><b>2</b> Test yourself</span><span class="ss-arrow">→</span>
+      <span class="ss"><b>3</b> Ask AI if stuck</span><span class="ss-arrow">→</span>
+      <span class="ss"><b>4</b> Mark it studied</span>
+    </div>
+    <div class="study-tools">
+      <span class="tools-lbl">Step 2 · Test yourself</span>
+      <button class="btn-line2 tool-hi" onclick="startQuiz(${cid})">📝 Quick quiz</button>
+      <button class="btn-line2 tool-hi" onclick="startCards(${cid})">🃏 Flashcards</button>
+      <span class="tools-spacer"></span>
+      <button class="btn-line2" onclick="printChapter()">🖨 Print / Save PDF</button>
+      <button class="btn-line2" onclick="downloadChapterSet(${cid}, this)">📝 Problem set PDF</button>
+      ${c.studied?'<span class="studied-chip">✓ Studied</span>':''}
+    </div>
+    <div id="tool-host"></div>
+    <div class="study-wrap">
+      <section class="study-main"><div class="study-main-lbl">Step 1 · Study sheet</div><div id="sheet-mount"></div></section>
+      <aside class="ask-side">
+        <h3>💬 Step 3 · Ask AI</h3><div class="hint">Stuck on “${esc(c.name)}”? Ask below, or tap one:</div>
+        <div class="ask-chips">
+          <button onclick="askPreset('Explain this chapter in simple terms')">Explain simply</button>
+          <button onclick="askPreset('Give me 2 more worked examples')">More examples</button>
+          <button onclick="askPreset('What is most likely to be on the exam?')">Exam focus</button>
+        </div>
+        <div class="ask-log" id="ask-log"></div>
+        <div class="ask-input"><input id="ask-q" placeholder="Type your question…" onkeydown="if(event.key==='Enter')askQ()">
+          <button class="btn-primary2" onclick="askQ()">Ask</button></div>
+      </aside>
+    </div>`;
+  const mount=document.getElementById("sheet-mount"); mount.appendChild(decorateSheet(c.html)); renderMermaid(mount);
+  // completion lives at the BOTTOM — you read the whole sheet, then mark it done.
+  const foot=document.createElement("div"); foot.className="sheet-done";
+  foot.innerHTML = c.studied
+    ? `<div class="sheet-done-msg">✓ You've studied this chapter — it's green on the map. Nice work!</div>
+       <button class="btn-line2" onclick="setGotIt(${cid},false)">Undo</button>`
+    : `<button class="gotit-btn" onclick="setGotIt(${cid},true)">✓ I've got this — mark studied</button>
+       <div class="hint" style="margin-top:8px">This turns the chapter green on your map. You can still reopen it anytime.</div>`;
+  mount.appendChild(foot);
+  loadQA(cid);
+}
+async function setGotIt(cid,val){
+  try{ await apiPostJson("/api/chapter/studied",{chapter_id:cid,studied:val}); }
+  catch(e){ toast("Couldn't save."); return; }
+  const sh=findSheet(cid); if(sh) sh.studied=val;
+  toast(val?"Marked studied — it's green on your map now ✓":"Marked as not studied");
+  renderStudy(cid);   // refresh so the button + chips reflect the new state
+}
+async function markStudied(cid,val){ await apiPostJson("/api/chapter/studied",{chapter_id:cid,studied:val});
+  const sh=findSheet(cid); if(sh) sh.studied=val; toast(val?"Marked studied":"Unmarked"); }
+async function toggleStudied(cid){
+  const sh=findSheet(cid); const val=!(sh&&sh.studied);
+  const b=document.getElementById("studied-toggle");
+  try{ await apiPostJson("/api/chapter/studied",{chapter_id:cid,studied:val}); }
+  catch(e){ toast("Couldn't save."); return; }
+  if(sh) sh.studied=val;
+  if(b){ b.classList.toggle("on",val); b.textContent=val?"✓ Studied":"Mark as studied"; }
+  toast(val?"Nice — marked as studied ✓":"Unmarked");
+}
+function askPreset(q){ const i=document.getElementById("ask-q"); if(i){ i.value=q; askQ(); } }
+function printChapter(){ const a=document.getElementById("print-area"); a.innerHTML="";
+  const c=findSheet(CUR_CH); if(c) a.appendChild(decorateSheet(c.html,true));
+  document.body.classList.add("printing"); window.print();
+  setTimeout(()=>{ document.body.classList.remove("printing"); a.innerHTML=""; },500); }
+
+/* Q&A */
+async function loadQA(cid){ const r=await apiGet("/api/qa/"+cid); const log=document.getElementById("ask-log"); if(!log) return;
+  log.innerHTML=(r.history||[]).map(h=>`<div class="bubble ${h.role==="ai"?"ai":"user"}">${esc(h.content)}</div>`).join(""); log.scrollTop=log.scrollHeight; }
+async function askQ(){ const inp=document.getElementById("ask-q"); const q=inp.value.trim(); if(!q) return; inp.value="";
+  const log=document.getElementById("ask-log");
+  log.innerHTML+=`<div class="bubble user">${esc(q)}</div><div class="bubble ai" id="pending"><span class="spin"></span></div>`; log.scrollTop=log.scrollHeight;
+  const r=await apiPostJson("/api/qa",{chapter_id:CUR_CH,question:q});
+  document.getElementById("pending").outerHTML=`<div class="bubble ai">${esc(r.answer||r.error||"Error")}</div>`; log.scrollTop=log.scrollHeight; }
+
+/* ============================ QUICK QUIZ ============================ */
+let QUIZ=null;
+async function startQuiz(cid){
+  const host=document.getElementById("tool-host");
+  host.innerHTML=`<div class="quiz-box"><span class="hint"><span class="spin"></span> Building a quiz…</span></div>`;
+  const r=await apiPostJson("/api/quiz/generate",{chapter_id:cid});
+  if(!r.ok){ host.innerHTML=`<div class="quiz-box"><div class="banner">${esc(r.error||"Couldn't build quiz")}</div></div>`; return; }
+  QUIZ={cid, qs:r.questions, ans:r.answers, expl:r.explanations, difficulty:r.difficulty||1, picked:new Array(r.questions.length).fill(null)};
+  renderQuiz();
+}
+function renderQuiz(){
+  const host=document.getElementById("tool-host");
+  const diffLbl={1:"Easy",2:"Medium",3:"Hard"}[QUIZ.difficulty||1];
+  const qs=QUIZ.qs.map((q,qi)=>`<div class="quiz-q"><div class="qtext">${qi+1}. ${esc(q.q)}</div>
+    ${q.choices.map((ch,ci)=>`<label class="quiz-opt" data-q="${qi}" data-c="${ci}" onclick="pickQuiz(${qi},${ci})">${esc(ch)}</label>`).join("")}
+    <div class="quiz-expl" id="expl-${qi}" style="display:none"></div></div>`).join("");
+  host.innerHTML=`<div class="quiz-box">
+    <div class="quiz-diff diff-${QUIZ.difficulty||1}">Difficulty: <b>${diffLbl}</b><span class="hint">adjusts to your score</span></div>
+    <div class="quiz-score" id="quiz-score" style="display:none"></div>${qs}
+    <button class="btn-primary2" id="quiz-submit" onclick="submitQuiz()" style="margin-top:12px">Submit quiz</button></div>`;
+}
+function pickQuiz(qi,ci){ if(QUIZ.done) return; QUIZ.picked[qi]=ci;
+  document.querySelectorAll(`.quiz-opt[data-q="${qi}"]`).forEach(e=>e.classList.toggle("sel", +e.dataset.c===ci)); }
+async function submitQuiz(){
+  if(QUIZ.done) return; QUIZ.done=true;
+  let correct=0; const wrong=[];
+  QUIZ.qs.forEach((q,qi)=>{
+    const right=QUIZ.ans[qi], pick=QUIZ.picked[qi];
+    document.querySelectorAll(`.quiz-opt[data-q="${qi}"]`).forEach(e=>{ const c=+e.dataset.c;
+      if(c===right) e.classList.add("correct"); if(c===pick&&pick!==right) e.classList.add("wrong"); });
+    const ex=document.getElementById("expl-"+qi); ex.style.display="block"; ex.textContent="→ "+QUIZ.expl[qi];
+    if(pick===right) correct++; else wrong.push({question:q.q, note:"Correct: "+q.choices[right]+". "+QUIZ.expl[qi]});
+  });
+  const sc=document.getElementById("quiz-score"); sc.style.display="block";
+  sc.textContent=`Score: ${correct}/${QUIZ.qs.length}`;
+  document.getElementById("quiz-submit").remove();
+  // always grade so the score adjusts difficulty and marks today's streak
+  let gr; try{ gr=await apiPostJson("/api/quiz/grade",
+    {chapter_id:QUIZ.cid, wrong, total:QUIZ.qs.length, correct}); }catch(e){ gr=null; }
+  if(wrong.length) sc.innerHTML+=` <span style="font-size:13px;color:var(--muted);font-weight:500">— ${wrong.length} added to Weak spots &amp; Review</span>`;
+  if(gr&&gr.next_difficulty && gr.next_difficulty!==(QUIZ.difficulty||1)){
+    const nd={1:"Easy",2:"Medium",3:"Hard"}[gr.next_difficulty];
+    const up=gr.next_difficulty>(QUIZ.difficulty||1);
+    sc.innerHTML+=`<div class="hint" style="margin-top:6px">${up?"Nice, leveling up ⬆":"Easing off ⬇"} — next quiz will be <b>${nd}</b></div>`;
+  }
+  refreshStreak();
+}
+
+/* ============================ FLASHCARDS ============================ */
+let CARDS=null, CARD_I=0, CARD_FLIP=false;
+async function startCards(cid){
+  const host=document.getElementById("tool-host");
+  host.innerHTML=`<div class="card2"><span class="hint"><span class="spin"></span> Loading flashcards…</span></div>`;
+  let cards=(await apiGet("/api/flashcards/"+cid)).cards;
+  if(!cards.length){ const r=await apiPostJson("/api/flashcards/generate",{chapter_id:cid});
+    if(!r.ok){ host.innerHTML=`<div class="card2"><div class="banner">${esc(r.error||"Couldn't build cards")}</div></div>`; return; } cards=r.cards; }
+  CARDS=cards; CARD_I=0; CARD_FLIP=false; renderCards();
+}
+function renderCards(){
+  const host=document.getElementById("tool-host"); const c=CARDS[CARD_I];
+  host.innerHTML=`<div class="card2"><div class="fc-stage">
+    <div class="fc-wrap"><div class="fc-card" onclick="flipCard()">
+      <span class="side-label">${CARD_FLIP?"Back":"Front"}</span>${esc(CARD_FLIP?c.back:c.front)}</div></div>
+    <div class="fc-controls">
+      <button class="btn-line2" onclick="cardNav(-1)">‹ Prev</button>
+      <span class="fc-count">${CARD_I+1} / ${CARDS.length}</span>
+      <button class="btn-line2" onclick="flipCard()">Flip</button>
+      <button class="btn-line2" onclick="cardNav(1)">Next ›</button>
+    </div><div class="hint">Click the card to flip.</div></div></div>`;
+}
+function flipCard(){ CARD_FLIP=!CARD_FLIP; renderCards(); }
+function cardNav(d){ CARD_I=(CARD_I+d+CARDS.length)%CARDS.length; CARD_FLIP=false; renderCards(); }
+
+/* ============================ PLAN ============================ */
+let PLAN_VIEW="path";
+async function renderPlan(){
+  const work=document.getElementById("work");
+  const r=await apiGet("/api/plan");
+  const items=r.items||[], exams=r.exams||[];
+  if(!items.length){ work.innerHTML=`<div class="empty2"><div class="big">No study plan yet</div>
+    Generate your sheets &amp; plan from a subject page.</div>`; return; }
+  const examByDay={}; exams.forEach(e=>{ (examByDay[e.date]=examByDay[e.date]||[]).push(e.subject); });
+  const subs=[...new Set(items.map(i=>i.subject).filter(Boolean))];
+  const cmap={}; subs.forEach((s,i)=>cmap[s]=subjColor(i));
+  const colorFor=s=>cmap[s]||"#6b7280";
+  work.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div><h1 class="page-h">Study plan</h1><p class="page-sub">Tap a day to see what to study. Today and exam days are marked.</p></div>
+    <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn-primary2" onclick="reschedulePlan(this)" title="Move anything you haven't checked off into the days you have left">🔄 I fell behind — redo plan</button>
+    <button class="btn-line2" id="pv-path" onclick="setPV('path')">Path</button>
+    <button class="btn-line2" id="pv-cal" onclick="setPV('cal')">Calendar</button>
+    <button class="btn-line2" id="pv-tbl" onclick="setPV('tbl')">Table</button></div></div>
+    <div id="plan-host"></div>`;
+  window._PLAN={items, examByDay, colorFor};
+  // months that have content, sorted; default to the month containing today
+  const byDay={}; items.forEach(it=>{ if(it.day)(byDay[it.day]=byDay[it.day]||[]).push(it); });
+  const allDays=[...new Set([...Object.keys(byDay),...Object.keys(examByDay)])].sort();
+  const months=[...new Set(allDays.map(d=>d.slice(0,7)))].sort();
+  window._PLAN.months=months; window._PLAN.byDay=byDay;
+  const todayM=new Date().toISOString().slice(0,7);
+  let mi=months.indexOf(todayM); if(mi<0){ mi=months.findIndex(m=>m>=todayM); if(mi<0) mi=0; }
+  window._PLAN.monthIdx=mi;
+  drawPlan();
+}
+function setPV(v){ PLAN_VIEW=v; drawPlan(); }
+function drawPlan(){
+  ["path","cal","tbl"].forEach(v=>{ const b=document.getElementById("pv-"+v); if(b) b.classList.toggle("active",PLAN_VIEW===v); });
+  const host=document.getElementById("plan-host");
+  host.innerHTML = PLAN_VIEW==="path" ? planPath() : (PLAN_VIEW==="cal" ? planCalendar() : planTable());
+}
+/* PATH view — each study DAY is an island; tap it to see that day's tasks. */
+/* a plan task counts as done when its chapter is studied (chapter tasks) or its
+   done flag is set (practice / final-review tasks, which have no sheet). */
+function studiedIdSet(){ const s=new Set(); studyChapters().forEach(c=>{ if(c.studied) s.add(c.id); }); return s; }
+function planTaskDone(it, S){ return it.chapter_id ? S.has(it.chapter_id) : !!it.done; }
+/* 3D cylinder island: ground shadow + side wall + top face (icon sits on the top face) */
+function cylNode(state,ico,click,i){
+  return `<button class="path-node ${state}" ${click} style="--i:${i}">`
+    +(state==="current"?`<span class="cyl-ripple back"><i></i></span><span class="cyl-ripple front"><i></i></span>`:"")+`<span class="cyl-shadow"></span><span class="cyl-side"></span>`
+    +`<span class="cyl-top"><span class="cyl-sheen"></span><span class="node-ico">${ico}</span></span></button>`;
+}
+function planPath(){
+  const p=window._PLAN;
+  const days=[...new Set([...Object.keys(p.byDay),...Object.keys(p.examByDay)])].sort();
+  if(!days.length) return planTable();
+  const today=new Date().toISOString().slice(0,10);
+  const S=studiedIdSet();
+  const nodes=days.map((iso,i)=>{
+    const items=p.byDay[iso]||[]; const exam=p.examByDay[iso];
+    const undone=items.filter(it=>!planTaskDone(it,S)).length;
+    let state, ico;
+    if(exam){ state="exam"; ico="🚩"; }
+    else if(items.length && undone===0){ state="done"; ico="✓"; }
+    else if(iso===today){ state="current"; ico=String(undone||items.length||"•"); }
+    else if(iso<today && undone>0){ state="missed"; ico="!"; }
+    else { state="ready"; ico=String(items.length||"•"); }
+    const off=Math.round(Math.sin(i*0.9)*70);
+    const dt=new Date(iso+"T00:00:00");
+    const lab=dt.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+    const dow=dt.toLocaleDateString(undefined,{weekday:"short"});
+    const flag = iso===today?`<div class="start-flag">TODAY</div>`:(exam?`<div class="start-flag exam">EXAM</div>`:"");
+    return `<div class="path-row" style="transform:translateX(${off}px)">
+      ${flag}
+      ${cylNode(state,ico,`onclick="openPlanDay('${iso}')"`,i)}
+      <div class="node-label">${lab} <span class="node-dow">${dow}</span></div>
+    </div>`;
+  }).join("");
+  return `<div id="day-panel"></div><div class="date-path">${nodes}</div>`;
+}
+function openPlanDay(iso){
+  const p=window._PLAN;
+  const items=p.byDay[iso]||[]; const exam=p.examByDay[iso];
+  const dt=new Date(iso+"T00:00:00");
+  const head=dt.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  const examLine=exam?`<div class="day-exam">🚩 Exam day — ${esc(exam.join(", "))}</div>`:"";
+  const S=studiedIdSet();
+  const rows=items.length ? items.map(it=>{
+    const done=planTaskDone(it,S);
+    let action;
+    if(it.chapter_id){
+      action = done ? `<span class="day-done">✓ Studied</span>`
+        : `<button class="btn-line2 day-open" onclick="go('#/study/${it.chapter_id}')">Open &amp; study →</button>`;
+    } else {
+      action = `<button class="btn-line2 ${it.done?'day-doneon':''}" onclick="togglePlanExtra(${it.id},'${iso}')">${it.done?'✓ Done':'Mark done'}</button>`;
+    }
+    return `<div class="day-task ${done?'done':''}">
+      <span class="day-check ${done?'on':''}">${done?'✓':'○'}</span>
+      <div class="day-task-body">
+        <div class="day-task-sub" style="color:${p.colorFor(it.subject)}">${esc(it.subject)}${it.chapter?' · '+esc(it.chapter):''}</div>
+        <div class="day-task-txt">${esc(it.task||'')}</div>
+      </div>${action}</div>`;
+  }).join("") : `<div class="hint">Nothing scheduled this day.</div>`;
+  const panel=document.getElementById("day-panel");
+  if(!panel) return;
+  panel.innerHTML=`<div class="day-card">
+    <div class="day-card-head"><b>${head}</b>
+      <button class="btn-line2" onclick="document.getElementById('day-panel').innerHTML=''">Close</button></div>
+    ${examLine}${rows}</div>`;
+  panel.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+async function togglePlanExtra(id, iso){
+  // only for practice-exam / final-review tasks (no chapter to study)
+  const p=window._PLAN; let target=null;
+  for(const d in p.byDay){ const f=p.byDay[d].find(x=>x.id===id); if(f){ target=f; break; } }
+  if(!target) return;
+  const val=!target.done; target.done = val?1:0;
+  try{ await apiPostJson("/api/plan/item",{id, day:target.day, subject:target.subject,
+    chapter:target.chapter, task:target.task, done:val}); }
+  catch(e){ toast("Couldn't save."); }
+  drawPlan(); openPlanDay(iso);
+}
+function changeMonth(d){ const p=window._PLAN; p.monthIdx=Math.max(0,Math.min(p.months.length-1,p.monthIdx+d)); drawPlan(); }
+function planCalendar(){
+  const p=window._PLAN;
+  if(!p.months.length) return planTable();
+  const ym=p.months[p.monthIdx]; const [y,m]=ym.split("-").map(Number);
+  const name=new Date(y,m-1,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const nav=`<div style="display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:10px">
+    <button class="btn-line2" ${p.monthIdx<=0?"disabled":""} onclick="changeMonth(-1)">‹</button>
+    <b style="font-family:var(--display);font-size:17px">${name}</b>
+    <button class="btn-line2" ${p.monthIdx>=p.months.length-1?"disabled":""} onclick="changeMonth(1)">›</button>
+    <span class="hint">Month ${p.monthIdx+1} of ${p.months.length}</span></div>`;
+  return `<div class="cal-wrap">${nav}${planMonth(y,m-1,p.byDay,p.examByDay,p.colorFor)}</div>`;
+}
+function planMonth(y,m,byDay,examByDay,colorFor){
+  const name=new Date(y,m,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const fd=new Date(y,m,1).getDay(), di=new Date(y,m+1,0).getDate();
+  const dow=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="cal-dow">${d}</div>`).join("");
+  let cells=""; for(let i=0;i<fd;i++) cells+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=di;d++){
+    const iso=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const exam=examByDay[iso]; const items=byDay[iso]||[];
+    const examChip=exam?`<span class="exam-chip">EXAM · ${esc(exam.join(", "))}</span>`:"";
+    const chips=items.map(it=>{ const c=colorFor(it.subject);
+      const whole=!it.chapter_id;
+      const sid=(SUBJECTS.find(s=>s.name===it.subject)||{}).id;
+      const open=it.chapter_id?`onclick="go('#/study/${it.chapter_id}')"`:(sid?`onclick="go('#/subject/${sid}')"`:"");
+      return `<div class="cal-chip ${it.done?'done':''} ${whole?'whole':''}" style="--c:${c}" ${open} title="${esc(it.task||'')}">
+        <span class="cal-chip-sub">${esc(it.subject)}</span><span class="cal-chip-ch">${esc(it.chapter||'')}</span></div>`;
+    }).join("");
+    cells+=`<div class="cal-cell ${exam?'exam-day':''}"><div class="cal-num">${d}</div>${examChip}${chips}</div>`;
+  }
+  return `<div class="cal-month"><div class="cal-title">${name}</div><div class="cal-grid">${dow}${cells}</div></div>`;
+}
+function planTable(){
+  const {items,examByDay,colorFor}=window._PLAN;
+  const rows=[]; const seenExam={};
+  let last=null;
+  // merge exam days into the row stream
+  const allDays=[...new Set([...items.map(i=>i.day),...Object.keys(examByDay)])].filter(Boolean).sort();
+  const byDay={}; items.forEach(it=>{ (byDay[it.day]=byDay[it.day]||[]).push(it); });
+  allDays.forEach(day=>{
+    rows.push(`<tr class="day-divider"><td colspan="4">${esc(day)}</td></tr>`);
+    if(examByDay[day]) rows.push(`<tr class="exam-row"><td>EXAM</td><td colspan="3">${esc(examByDay[day].join(", "))} — exam day</td></tr>`);
+    (byDay[day]||[]).forEach(it=>{ const c=colorFor(it.subject);
+      const sid=(SUBJECTS.find(s=>s.name===it.subject)||{}).id;
+      const open=it.chapter_id?`go('#/study/${it.chapter_id}')`:(sid?`go('#/subject/${sid}')`:"");
+      rows.push(`<tr class="${it.done?'done':''}">
+        <td style="width:150px"><span class="tbl-dot" style="background:${c}"></span>${esc(it.subject)}</td>
+        <td style="width:170px">${esc(it.chapter||'')}</td>
+        <td>${esc(it.task||'')}</td>
+        <td style="width:70px">${open?`<button class="btn-line2" style="padding:4px 10px" onclick="${open}">Open</button>`:""}</td></tr>`);
+    });
+  });
+  return `<table class="plan-table"><thead><tr><th>Subject</th><th>Chapter</th><th>Task</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
+}
+
+/* ============================ WEAK SPOTS ============================ */
+async function renderWeak(){
+  const work=document.getElementById("work");
+  const r=await apiGet("/api/weak-spots");
+  const ws=r.weak_spots||[];
+  if(!ws.length){ work.innerHTML=`<h1 class="page-h">Weak spots</h1>
+    <div class="empty2"><div class="big">Nothing to review 🎉</div>Questions you miss on quizzes show up here so you can target them.</div>`; return; }
+  work.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div><h1 class="page-h">Weak spots</h1><p class="page-sub">Questions you missed on quizzes. Practice them, then mark resolved.</p></div>
+      <button class="btn-primary2" onclick="startWeakPractice()">🎯 Practice these</button></div>
+    <div class="card2">${ws.map(w=>`<div style="padding:12px 0;border-bottom:1px solid var(--line)">
+      <div style="font-weight:600">${esc(w.question||'')}</div>
+      <div class="hint" style="margin:4px 0">${esc(w.subject||'')} · ${esc(w.chapter||'')}</div>
+      <div style="font-size:13px">${esc(w.note||'')}</div>
+      <button class="btn-line2" style="margin-top:8px;padding:5px 12px" onclick="resolveWeak(${w.id},this)">Mark resolved</button>
+      ${w.chapter_id?`<button class="btn-line2" style="margin-top:8px;padding:5px 12px" onclick="go('#/study/${w.chapter_id}')">Open chapter</button>`:""}
+    </div>`).join("")}</div>`;
+}
+function doodleArrow(light){
+  // hand-drawn squiggly arrow (points right at the thing you should click)
+  const st = light ? "#ffffff" : "#3d7bff";
+  return `<svg class="doodle-arrow ${light?'light':''}" viewBox="0 0 66 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M5 9 C 1 28, 27 7, 24 29 C 22 41, 43 33, 52 31" stroke="${st}" stroke-width="3.4" stroke-linecap="round"/>
+    <path d="M44 24 L55 31 L45 38" stroke="${st}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+async function resolveWeak(id,btn){ await apiPostJson("/api/weak-spots/resolve",{id}); btn.closest("div").style.opacity=.4; btn.disabled=true; }
+
+async function setChapterWeight(cid, w, el){
+  // fill stars up to w on the clicked node
+  if(el&&el.parentElement){ el.parentElement.querySelectorAll(".pstar").forEach((st,i)=>st.classList.toggle("on", i<w)); }
+  // keep local model in sync so later re-renders remember it
+  for(const s of SUBJECTS){ const ch=s.chapters.find(x=>x.id===cid); if(ch){ ch.weight=w; break; } }
+  try{ await apiPostJson("/api/chapter/weight",{chapter_id:cid, weight:w});
+    toast("Importance set — press Apply to update your plan."); }
+  catch(e){ toast("Couldn't update importance."); }
+}
+
+/* Dynamic reschedule: move everything you HAVEN'T checked off into the days you have left
+   before each exam (finished days stay put). No AI, no cost. */
+async function reschedulePlan(btn){
+  const old=btn.textContent; btn.disabled=true; btn.innerHTML='<span class="spin"></span> Redoing…';
+  let r; try{ r=await apiPostJson("/api/plan/reschedule",{}); }catch(e){ r=null; }
+  if(!r||!r.ok){ toast((r&&r.error)||"Couldn't redo the plan."); btn.disabled=false; btn.textContent=old; return; }
+  await renderPlan();
+  const tight=(r.subjects||[]).filter(s=>s.tight).map(s=>s.subject);
+  if(!r.moved) toast("You're all caught up — nothing to move. 🎉");
+  else if(tight.length) toast(`Re-planned ${r.moved} task(s). Heads up: not much time left for ${tight.join(", ")}.`);
+  else toast(`Re-planned ${r.moved} unfinished task(s) across your remaining days.`);
+}
+
+/* Weak-spot practice: re-serve missed questions as recall cards (question -> reveal answer).
+   Reuses saved wrong answers — no AI, no cost. */
+async function startWeakPractice(){
+  const work=document.getElementById("work");
+  work.innerHTML=`<div class="crumb" onclick="go('#/weak');route()">← Back to weak spots</div>
+    <h1 class="page-h">Practice weak spots</h1>
+    <div id="wk-host"><div class="hint"><span class="spin"></span> Loading…</div></div>`;
+  let r; try{ r=await apiGet("/api/weak-spots/retest"); }catch(e){ r=null; }
+  const cards=(r&&r.cards)||[];
+  if(!cards.length){ document.getElementById("wk-host").innerHTML=`<div class="empty2"><div class="big">Nothing to practice 🎉</div>Miss some quiz questions and they'll show up here.</div>`; return; }
+  window._WK={cards, i:0}; renderWeakCard();
+}
+function renderWeakCard(){
+  const w=window._WK, host=document.getElementById("wk-host"); if(!host) return;
+  const c=w.cards[w.i];
+  if(!c){ host.innerHTML=`<div class="empty2"><div class="big">Done! 🎉</div>You went through all of them.
+    <div style="margin-top:12px"><button class="btn-primary2" onclick="go('#/weak');route()">Back to weak spots</button></div></div>`; return; }
+  host.innerHTML=`<div class="hint" style="margin-bottom:8px">Card ${w.i+1} of ${w.cards.length}</div>
+    <div class="card2">
+      <div class="hint">${esc(c.chapter||"")}</div>
+      <div style="font-weight:600;font-size:16px;margin:6px 0 12px">${esc(c.question||"")}</div>
+      <div id="wk-ans" style="display:none;background:var(--bg-2,#f3f4f6);border-radius:10px;padding:10px 12px;font-size:14px">${esc(c.note||"(no answer saved)")}</div>
+      <div id="wk-actions" style="margin-top:12px">
+        <button class="btn-primary2" onclick="weakReveal()">Show answer</button></div>
+    </div>`;
+}
+function weakReveal(){
+  const a=document.getElementById("wk-ans"); if(a) a.style.display="block";
+  document.getElementById("wk-actions").innerHTML=`
+    <button class="btn-primary2" onclick="weakGot()">✓ Got it — remove</button>
+    <button class="btn-line2" onclick="weakNext()">Still tricky — next</button>`;
+}
+async function weakGot(){
+  const c=window._WK.cards[window._WK.i];
+  if(c&&c.id){ try{ await apiPostJson("/api/weak-spots/resolve",{id:c.id}); }catch(e){} }
+  weakNext();
+}
+function weakNext(){ window._WK.i++; renderWeakCard(); }
+
+/* ============================ REVIEW (spaced repetition) ============================ */
+/* Cards that are DUE today (from flashcards + missed quiz questions). You recall, reveal,
+   then say if you remembered. Remembered pushes the next review further out; forgot brings
+   it back tomorrow. No AI, no cost. */
+async function renderReview(){
+  const work=document.getElementById("work");
+  work.innerHTML=`<h1 class="page-h">🔁 Review</h1>
+    <p class="page-sub">Cards due today. Recall the answer, then say if you got it.</p>
+    <div id="rv-host"><div class="hint"><span class="spin"></span> Loading…</div></div>`;
+  let r; try{ r=await apiGet("/api/review/due"); }catch(e){ r=null; }
+  const cards=(r&&r.cards)||[];
+  if(!cards.length){
+    document.getElementById("rv-host").innerHTML=`<div class="empty2"><div class="big">All caught up 🎉</div>
+      Nothing due today. Study a chapter or take a quiz, and cards will show up here on their schedule.</div>`;
+    return;
+  }
+  window._RV={cards, i:0, done:0}; renderReviewCard();
+}
+function renderReviewCard(){
+  const rv=window._RV, host=document.getElementById("rv-host"); if(!host) return;
+  const c=rv.cards[rv.i];
+  if(!c){ host.innerHTML=`<div class="empty2"><div class="big">Done for today ✅</div>
+    You reviewed ${rv.done} card${rv.done===1?"":"s"}. Come back tomorrow to keep them fresh.</div>`;
+    refreshStreak(); return; }
+  const kindLbl = c.kind==="flashcard" ? "Flashcard" : "Missed question";
+  // two faces in one 3D card: front = question, back = answer (rotated 180deg)
+  host.innerHTML=`<div class="rv-progress"><div class="rv-progress-bar"><span style="width:${100*rv.i/rv.cards.length}%"></span></div>
+      <span class="hint">${rv.i+1} / ${rv.cards.length}</span></div>
+    <div class="rv-scene"><div class="rv-flip" id="rv-flip" onclick="reviewReveal()">
+      <div class="rv-face front">
+        <div class="rv-meta">${esc(c.chapter||"")} · ${kindLbl}</div>
+        <div class="rv-front">${esc(c.front||"")}</div>
+        <div class="rv-tap">TAP THE CARD TO FLIP</div>
+      </div>
+      <div class="rv-face back">
+        <div class="rv-meta">Answer</div>
+        <div class="rv-answer">${esc(c.back||"(no answer saved)")}</div>
+      </div>
+    </div></div>
+    <div id="rv-actions" class="rv-actions">
+      <button class="btn-primary2 rv-reveal" onclick="reviewReveal()">Show answer</button>
+    </div>`;
+}
+function reviewReveal(){
+  const f=document.getElementById("rv-flip"); if(!f || f.classList.contains("flipped")) return;
+  f.classList.add("flipped");
+  document.getElementById("rv-actions").innerHTML=`
+    <button class="rv-forgot" onclick="reviewGrade(false)">✗ Forgot</button>
+    <button class="rv-got" onclick="reviewGrade(true)">✓ Remembered</button>`;
+}
+async function reviewGrade(remembered){
+  const rv=window._RV, c=rv.cards[rv.i];
+  try{ await apiPostJson("/api/review/grade",{item_id:c.item_id, remembered}); }catch(e){}
+  rv.done++; rv.i++; renderReviewCard();
+}
+
+/* ============================ NEW (onboarding) ============================ */
+let PREVIEW=[], PRESET_PICKS={};
+/* Onboarding is chooser-first: pick ONE way to start, then only that path shows —
+   so a first-time user sees one simple choice instead of three dense panels at once. */
+let ONB_GRADE=null;
+/* Onboarding, in order: New -> pick GRADE first -> then choose how to add classes
+   (syllabus/files, pick from list, or type by hand). Grade up front means the list path
+   and AI chapter lists already know the grade. */
+function renderNew(){
+  ONB_GRADE=null;
+  const work=document.getElementById("work");
+  const grades=[["0","K"],["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"],["8","8"],["9","9"],["10","10"],["11","11"],["12","12"]];
+  work.innerHTML=`<h1 class="page-h">Add your classes</h1>
+    <p class="page-sub">First — what grade are you in?</p>
+    <div class="grade-pills" id="onb-grades">${grades.map(([v,l])=>`<button class="grade-pill" data-g="${v}" onclick="onbPickGrade('${v}')">Grade ${l}</button>`).join("")}</div>
+    <div id="onb-methods"></div>`;
+}
+function onbPickGrade(g){
+  ONB_GRADE=g; window._GRADE=g;
+  document.querySelectorAll("#onb-grades .grade-pill").forEach(e=>e.classList.toggle("active", e.dataset.g===g));
+  const card=(m,ic,title,desc)=>`<div class="ed-method" id="np-${m}" onclick="newPick('${m}')">
+      <div class="edm-ic">${ic}</div>
+      <div><div class="edm-t">${title}</div><div class="edm-d">${desc}</div></div></div>`;
+  document.getElementById("onb-methods").innerHTML=`
+    <p class="page-sub" style="margin-top:20px">Now — how do you want to add your classes?</p>
+    <div class="ed-methods" style="max-width:640px">
+      ${card('files','📄','Upload my syllabus or files','Drop a syllabus, notes, or a folder — we set up subjects &amp; chapters for you.')}
+      ${card('pick','✅','Pick from the class list','Check the classes you take — we make them for your grade.')}
+      ${card('manual','✍️','Type it in myself','Add one subject and type its chapters by hand.')}
+    </div>
+    <div id="new-path" style="max-width:640px;margin-top:6px"></div>`;
+}
+function newPick(m){
+  document.querySelectorAll(".ed-method").forEach(e=>e.classList.remove("sel"));
+  const el=document.getElementById("np-"+m); if(el) el.classList.add("sel");
+  if(m==="files") newPathFiles();
+  else if(m==="pick") newPathPreset();
+  else if(m==="manual") newPathManual();
+}
+function newBack(){ if(ONB_GRADE!=null) onbPickGrade(ONB_GRADE); else renderNew(); }
+function newPathFiles(){
+  document.getElementById("new-path").innerHTML=`
+    <button class="ed-back" onclick="newBack()">← Back</button>
+    <div class="card2">
+      <div style="font-weight:600;margin-bottom:4px">Upload your syllabus or files</div>
+      <p class="hint" style="margin:0 0 10px">A syllabus, class notes, slides, photos, or a whole folder (.zip). We read them and set up your subjects and chapters automatically.</p>
+      <label class="dropzone2"><div class="big">Click to choose files</div>
+        <div>PDF, Word, slides, photos, or a folder</div>
+        <input type="file" id="new-files" multiple style="display:none" onchange="importFiles(this)"></label>
+      <div id="import-msg" style="margin-top:12px"></div>
+    </div>`;
+}
+function newPathPreset(){
+  document.getElementById("new-path").innerHTML=`
+    <button class="ed-back" onclick="newBack()">← Back</button>
+    <div class="card2">
+      <div style="font-weight:600;margin-bottom:4px">Pick your classes</div>
+      <p class="hint" style="margin:0 0 10px">Check the classes you're taking. We'll create them for grade ${ONB_GRADE==="0"?"K":ONB_GRADE} with chapter lists made for you.</p>
+      <div id="course-pick"></div>
+    </div>`;
+  pickGrade(ONB_GRADE);
+}
+function newPathManual(){
+  document.getElementById("new-path").innerHTML=`
+    <button class="ed-back" onclick="newBack()">← Back</button>
+    <div class="card2">
+      <div style="font-weight:600;margin-bottom:4px">Type it in</div>
+      <p class="hint" style="margin:0 0 10px">Add one subject, then type the chapters that are on your exam (one per line). Leave blank to let AI fill them.</p>
+      <div class="field"><label>Subject name</label><input id="man-name" placeholder="e.g. AP Chemistry"></div>
+      <div class="field"><label>Chapters (one per line — optional, blank = AI fills them)</label>
+        <textarea id="man-syl" style="min-height:90px;width:100%"></textarea></div>
+      <button class="btn-primary2" onclick="addManual()">Add subject</button>
+    </div>`;
+}
+/* path 1 — file import (reuses preview-import + commit-import) */
+async function importFiles(input){
+  if(!input.files.length) return;
+  const msg=document.getElementById("import-msg");
+  msg.innerHTML=`<div class="hint"><span class="spin"></span> Reading ${input.files.length} file(s) and finding subjects…</div>`;
+  const fd=new FormData(); for(const f of input.files) fd.append("files",f); input.value="";
+  let r; try{ r=await apiPostForm("/api/syllabus/preview-import",fd); }catch(e){ msg.innerHTML=`<div class="banner">Couldn't read those files.</div>`; return; }
+  if(r.error){ msg.innerHTML=`<div class="banner">${esc(r.error)}</div>`; return; }
+  PREVIEW=r.subjects||[]; renderPreview(r);
+}
+function renderPreview(r){
+  const msg=document.getElementById("import-msg");
+  const list=PREVIEW.map((s,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">
+    <div><b>${esc(s.name)}</b> <span class="hint">${s.chapters.length} chapters</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button type="button" class="exam-date-btn ${s.exam_date?'set':''}" onclick="openPrevPicker(${i})">${s.exam_date?fmtExamDate(s.exam_date):'Set exam date'}</button>
+      <input type="date" id="prev-date-${i}" value="${esc(s.exam_date||'')}"
+        style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
+        onchange="onPrevDate(${i}, this.value)">
+      <button class="x-btn" onclick="PREVIEW.splice(${i},1);renderPreview({file_count:'the'})">&times;</button></div></div>`).join("");
+  msg.innerHTML=`<div class="card2"><div style="font-weight:600;margin-bottom:6px">Found ${PREVIEW.length} subject(s):</div>
+    ${r.warning?`<div class="banner">${esc(r.warning)}</div>`:""}${list}
+    <div style="margin-top:12px"><button class="btn-primary2" onclick="commitImport(this)">Create ${PREVIEW.length} subject(s)</button>
+    <button class="btn-line2" onclick="document.getElementById('import-msg').innerHTML=''">Cancel</button></div></div>`;
+}
+function openPrevPicker(i){ const el=document.getElementById("prev-date-"+i); if(!el) return;
+  if(el.showPicker){ try{ el.showPicker(); return; }catch(e){} } el.style.position="static"; el.style.opacity="1"; el.style.pointerEvents="auto"; el.focus(); el.click(); }
+function onPrevDate(i, val){ PREVIEW[i].exam_date=val; renderPreview({file_count:'the'}); }
+async function commitImport(btn){
+  if(!PREVIEW.length){ document.getElementById("import-msg").innerHTML=""; return; }
+  btn.disabled=true; btn.textContent="Creating…";
+  const r=await apiPostJson("/api/syllabus/commit-import",{subjects:PREVIEW});
+  if(r.error){ toast(r.error); btn.disabled=false; return; }
+  toast(`Created ${(r.created||[]).length} subject(s).`); await loadAll(); go('#/home');
+}
+/* path 2 — preset picker */
+function renderGradePills(){
+  const grades=[["0","K"],["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"],["8","8"],["9","9"],["10","10"],["11","11"],["12","12"]];
+  document.getElementById("grade-pills").innerHTML=grades.map(([v,l])=>`<button class="grade-pill" data-g="${v}" onclick="pickGrade('${v}')">Grade ${l}</button>`).join("");
+}
+async function pickGrade(g){
+  document.querySelectorAll(".grade-pill").forEach(e=>e.classList.toggle("active",e.dataset.g===g));
+  PRESET_PICKS={}; window._GRADE=g; window._PRESET_REG=[]; window._PRESET_GROUPS={};
+  const r=await apiGet("/api/presets?grade="+g);
+  const host=document.getElementById("course-pick");
+  const groups=(r.groups||[]).map(grp=>{
+    const gid="grp_"+grp.area.replace(/\W+/g,"");
+    window._PRESET_GROUPS[gid]=[];
+    const cards=grp.courses.map(c=>{
+      const id="cp_"+grp.area.replace(/\W+/g,"")+"_"+c.name.replace(/\W+/g,"");
+      const on=!!c.recommended;
+      window._PRESET_REG.push({id, name:c.name, defLevel:c.levels[0]});
+      window._PRESET_GROUPS[gid].push(id);
+      if(on) PRESET_PICKS[c.name]={name:c.name, level:c.levels[0]};
+      const opts=c.levels.map(l=>`<option>${esc(l)}</option>`).join("");
+      return `<div class="course-pick ${on?'on':''}" id="${id}" data-name="${esc(c.name)}" onclick="toggleCourse('${id}','${esc(c.name)}')">
+        <input type="checkbox" ${on?"checked":""} style="pointer-events:none">
+        <span class="cp-name">${esc(c.name)}</span>
+        <select class="cp-level" onclick="event.stopPropagation()" onchange="setLevel('${id}','${esc(c.name)}',this.value)">${opts}</select>
+      </div>`;
+    }).join("");
+    return `<div class="course-group"><div class="course-group-h">
+        <span>${esc(grp.area)}</span>
+        <button type="button" class="group-toggle" onclick="toggleGroup('${gid}')">select all</button>
+      </div>
+      <div class="course-list">${cards}</div></div>`;
+  }).join("");
+  host.innerHTML=`<div class="hint" style="margin:6px 0 10px">Recommended for grade ${g==="0"?"K":g} are pre-checked.
+      Each subject has one card — pick its level (Standard / Honors / AP) in the dropdown.</div>
+    <div class="select-all-bar">
+      <label class="select-all"><input type="checkbox" id="select-all-cb" onchange="selectAllPresets(this.checked)"> Select all</label>
+      <span class="hint" id="pick-count"></span>
+    </div>
+    ${groups}
+    <button class="btn-primary2" style="margin-top:16px" onclick="createPresets(this)">Create selected subjects</button>`;
+  updatePickCount();
+}
+function _setCard(id, on){
+  const el=document.getElementById(id); if(!el) return;
+  el.classList.toggle("on",on); el.querySelector("input").checked=on;
+  const name=el.dataset.name;
+  if(on) PRESET_PICKS[name]={name, level:el.querySelector("select").value};
+  else delete PRESET_PICKS[name];
+}
+function selectAllPresets(on){
+  (window._PRESET_REG||[]).forEach(r=>_setCard(r.id,on));
+  updatePickCount();
+}
+function toggleGroup(gid){
+  const ids=(window._PRESET_GROUPS||{})[gid]||[];
+  const allOn=ids.every(id=>document.getElementById(id).classList.contains("on"));
+  ids.forEach(id=>_setCard(id,!allOn));
+  updatePickCount();
+}
+function updatePickCount(){
+  const total=(window._PRESET_REG||[]).length;
+  const n=Object.keys(PRESET_PICKS).length;
+  const cnt=document.getElementById("pick-count"); if(cnt) cnt.textContent=`${n} of ${total} selected`;
+  const master=document.getElementById("select-all-cb");
+  if(master){ master.checked=n===total && total>0; master.indeterminate=n>0&&n<total; }
+}
+function toggleCourse(id,name){
+  const el=document.getElementById(id); const on=!el.classList.contains("on");
+  el.classList.toggle("on",on); el.querySelector("input").checked=on;
+  if(on) PRESET_PICKS[name]={name, level:el.querySelector("select").value};
+  else delete PRESET_PICKS[name];
+  updatePickCount();
+}
+function setLevel(id,name,lv){
+  const el=document.getElementById(id);
+  if(!el.classList.contains("on")){ el.classList.add("on"); el.querySelector("input").checked=true; }
+  PRESET_PICKS[name]={name, level:lv};
+  updatePickCount();
+}
+function presetLabel(c){
+  const lv=(c.level||"").trim();
+  if(!lv||lv==="Standard") return c.name;
+  if(lv.startsWith("AP")) return lv.includes(" ")?lv:("AP "+c.name);
+  return `${c.name} (${lv})`;
+}
+async function createPresets(btn){
+  const courses=Object.values(PRESET_PICKS); if(!courses.length){ toast("Pick at least one course."); return; }
+  // 2+ subjects -> ask how important each one is before creating
+  if(courses.length>=2){ showImportanceStep(courses); return; }
+  courses[0].importance=2;
+  submitPresets(courses, btn);
+}
+function showImportanceStep(courses){
+  window._IMP=courses.map(()=>2);
+  const rows=courses.map((c,i)=>`<div class="imp-row">
+      <div class="imp-name">${esc(presetLabel(c))}</div>
+      <div class="imp-pills">
+        ${[["1","Low"],["2","Medium"],["3","High"]].map(([v,l])=>`<button type="button" class="imp-pill ${v==="2"?"sel":""}" onclick="pickImp(${i},${v},this)">${l}</button>`).join("")}
+      </div></div>`).join("");
+  const host=document.getElementById("new-path")||document.getElementById("course-pick");
+  host.innerHTML=`<button class="ed-back" onclick="newPathPreset()">← Back</button>
+    <div class="card2">
+      <div style="font-weight:600;margin-bottom:4px">How important is each subject?</div>
+      <p class="hint" style="margin:0 0 12px">We'll give more study time to the ones that matter most. You can change this later.</p>
+      ${rows}
+      <button class="btn-primary2" style="margin-top:14px" id="imp-go" onclick="submitPresets(Object.values(PRESET_PICKS).map((c,i)=>Object.assign({},c,{importance:window._IMP[i]})), this)">Create subjects</button>
+    </div>`;
+}
+function pickImp(i,v,el){
+  window._IMP[i]=v;
+  el.parentElement.querySelectorAll(".imp-pill").forEach(p=>p.classList.toggle("sel", p===el));
+}
+async function submitPresets(courses, btn){
+  if(btn){ btn.disabled=true; btn.textContent="Creating (AI is writing chapter lists)…"; }
+  const r=await apiPostJson("/api/onboard/preset",{grade:window._GRADE, courses});
+  if(r.error){ toast(r.error); if(btn){ btn.disabled=false; btn.textContent="Create subjects"; } return; }
+  toast(`Created ${(r.created||[]).length} subject(s).`); await loadAll(); go('#/home');
+}
+/* path 3 — manual */
+async function addManual(){
+  const name=document.getElementById("man-name").value.trim(); if(!name){ toast("Enter a subject name."); return; }
+  const fd=new FormData(); fd.append("name",name); fd.append("exam_scope","ALL");
+  const sid=(await apiPostForm("/api/subject",fd)).subject_id;
+  const syl=document.getElementById("man-syl").value.trim();
+  if(syl){ const f2=new FormData(); f2.append("subject_id",sid); f2.append("mode","user"); f2.append("chapters_text",syl); await apiPostForm("/api/syllabus",f2); }
+  else { const f2=new FormData(); f2.append("subject_id",sid); f2.append("mode","ai"); f2.append("chapters_text",""); await apiPostForm("/api/syllabus",f2); }
+  toast("Subject added."); await loadAll(); go('#/home');
+}
+
+/* ============================ GENERATE (sheets + plan) ============================ */
+function genProgHTML(){
+  return `<div class="prog" style="margin-top:14px">
+    <div class="prog-top"><span id="gp-pct">0%</span><span class="hint" id="gp-eta"></span></div>
+    <div class="prog-bar"><i id="gp-bar"></i></div>
+    <div class="prog-msg" id="gp-msg">Starting…</div>
+    <div class="hint" id="gp-now"></div>
+    <div id="gp-sub" style="margin-top:6px;display:none">
+      <div class="prog-bar" style="height:5px;margin:6px 0 0"><i id="gp-subbar"></i></div>
+      <div class="hint" id="gp-subtext" style="margin-top:3px"></div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="tool-btn" id="gp-stop" onclick="stopGen(this)">Stop</button>
+      <span class="hint" style="margin-left:8px">Finished chapters are saved — stopping is safe.</span>
+    </div></div>`;
+}
+async function stopGen(btn){
+  if(btn){ btn.disabled=true; btn.textContent="Stopping…"; }
+  try{ await apiPostJson("/api/generate/cancel",{}); }catch(e){}
+}
+async function generateNow(){
+  const pre=await apiPostJson("/api/generate/preview",{});
+  const total=(pre.with_material||[]).length+(pre.empty||[]).length;
+  if(!total){ toast("Add chapters and files first."); return; }
+  const approved=(pre.empty||[]).map(e=>e.chapter_id);   // auto-approve empty chapters
+  const r=await apiPostJson("/api/generate/run",{approved_empty:approved});
+  if(r.error){ toast(r.error); return; }
+  // generation started -> stop the "apply" pulse (pulse is only for the before-build state)
+  const bb=document.querySelector(".wf-build");
+  if(bb){ bb.classList.add("running"); bb.disabled=true;
+    const cta=bb.querySelector(".wf-cta"); if(cta) cta.textContent="Building…"; }
+  const host=document.querySelector('[id^="su-prog-"]')||document.getElementById("work");
+  host.innerHTML=genProgHTML();
+  startGenPoll();
+}
+// When the page is (re)rendered while a job is already running — e.g. you navigated
+// away and came back — re-mount the live progress and resume polling so it never
+// looks like the work vanished. Also overrides the misleading "not applied / Apply"
+// messaging with a "Building now…" state.
+async function resumeGenIfRunning(sid){
+  let r; try{ r=await apiGet("/api/generate/progress"); }catch(e){ return; }
+  if(r.state!=="running") return;
+  const host=document.getElementById("su-prog-"+sid);
+  if(host && !host.querySelector(".prog")) host.innerHTML=genProgHTML();
+  const pn=document.getElementById("pending-note-"+sid);
+  if(pn) pn.textContent="⏳ Building sheets & plan now — progress below.";
+  const b2=document.getElementById("wf-build-"+sid);
+  if(b2){
+    b2.disabled=true; b2.classList.add("running");
+    const t=b2.querySelector(".wf-title"); if(t)t.textContent="Building sheets & plan…";
+    const sub=b2.querySelector(".wf-sub"); if(sub)sub.textContent="In progress — see the bar below.";
+    const cta=b2.querySelector(".wf-cta"); if(cta)cta.textContent="Building…";
+  }
+  startGenPoll();
+}
+function genStep(r){
+  const phase=(r.phase||"").toLowerCase();
+  if(phase==="read")  return "Step 1/3 · Reading your files";
+  if(phase==="write") return "Step 2/3 · Writing study sheets";
+  if(phase==="plan")  return "Step 3/3 · Building your plan";
+  if(phase==="prep")  return "Getting ready…";
+  const m=(r.message||"").toLowerCase();
+  if(m.startsWith("reading")) return "Step 1/3 · Reading your files";
+  if(m.startsWith("summarizing")||m.startsWith("writing")) return "Step 2/3 · Writing study sheets";
+  if(m.includes("plan")) return "Step 3/3 · Building your plan";
+  return "Working…";
+}
+let GEN_POLLING=false;
+function startGenPoll(){ if(GEN_POLLING) return; GEN_POLLING=true; pollGen(); }
+async function pollGen(){
+  const bar=document.getElementById("gp-bar");
+  if(!bar){ GEN_POLLING=false; return; }   // box gone (navigated away) — stop this loop
+  const r=await apiGet("/api/generate/progress");
+  const pct=r.total?Math.round(r.done/r.total*100):(r.state==="running"?6:0);
+  bar.style.width=pct+"%";
+  const pe=document.getElementById("gp-pct"); if(pe)pe.textContent=pct+"%";
+  const msg=document.getElementById("gp-msg"), now=document.getElementById("gp-now"), eta=document.getElementById("gp-eta");
+  const sub=document.getElementById("gp-sub"), subbar=document.getElementById("gp-subbar"), subtxt=document.getElementById("gp-subtext");
+  if(eta) eta.textContent=fmtEta(r.eta_sec);
+  if(r.state==="running"){
+    if(msg) msg.textContent=`${genStep(r)} — ${r.done}/${r.total} chapters`;
+    let line=r.chapter?`📖 ${r.chapter}`:(r.message||"");
+    if(r.ch_elapsed>0) line+=` · ${r.ch_elapsed}s`;
+    if(now) now.textContent=line;
+    if(sub){
+      if(r.phase==="read" && r.sub_total>0){
+        sub.style.display="block";
+        if(subbar)subbar.style.width=Math.round(r.sub_done/r.sub_total*100)+"%";
+        if(subtxt)subtxt.textContent=`Reading section ${r.sub_done}/${r.sub_total} of this chapter`;
+      } else if(r.phase==="write"){
+        sub.style.display="block";
+        if(subbar)subbar.style.width="100%";
+        if(subtxt)subtxt.textContent=`Writing the full study sheet… this is the slow part (${r.ch_elapsed||0}s)`;
+      } else sub.style.display="none";
+    }
+    setTimeout(pollGen,800);
+  }
+  else if(r.state==="done"){ GEN_POLLING=false; bar.style.width="100%"; if(pe)pe.textContent="100%"; if(eta)eta.textContent="";
+    if(sub)sub.style.display="none";
+    if(msg)msg.textContent="Done — sheets & plan updated."; if(now)now.textContent="";
+    await loadAll(); toast("Updated. Sheets & plan are up to date."); setTimeout(route,600); }
+  else if(r.state==="cancelled"){ GEN_POLLING=false; if(sub)sub.style.display="none"; if(eta)eta.textContent="";
+    if(msg)msg.innerHTML=`<span style="color:var(--indigo)">Stopped.</span> Finished chapters are saved &amp; cached — press Apply again to resume from here.`;
+    if(now)now.textContent=""; await loadAll(); setTimeout(route,800); }
+  else if(r.state==="error"){ GEN_POLLING=false; if(sub)sub.style.display="none";
+    if(msg)msg.innerHTML=`<span style="color:var(--red)">Error: ${esc(r.error||'')} — check the newest file in the logs folder.</span>`; if(now)now.textContent=""; }
+  else { GEN_POLLING=false; }
+}
+function fmtEta(s){ if(!s||s<=0) return ""; if(s<60) return "~"+s+"s left"; return "~"+Math.round(s/60)+" min left"; }
+
+/* ============================ backup restore ============================ */
+async function importDB(){
+  const input=document.getElementById("db-file"); if(!input.files.length) return;
+  if(!confirm("Restoring replaces current data with the backup. Continue?")){ input.value=""; return; }
+  const fd=new FormData(); fd.append("file",input.files[0]);
+  const r=await apiPostForm("/api/db/import",fd); input.value="";
+  if(r.ok){ toast("Backup restored."); await loadAll(); go('#/home'); route(); } else toast(r.error||"Restore failed");
+}
+
+/* ============================ boot ============================ */
+/* ============================ 3D tilt ============================ */
+/* Cards lean toward the cursor (perspective rotateX/Y) and a soft glare follows it.
+   Skipped for users who prefer reduced motion. */
+(function(){
+  if(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const SEL=".subj-card,.stat-tile,.ed-method,.recent-chip";
+  let cur=null;
+  const reset=el=>{ el.style.transform=""; };
+  document.addEventListener("pointermove",e=>{
+    const el=e.target.closest ? e.target.closest(SEL) : null;
+    if(cur && cur!==el){ reset(cur); cur=null; }
+    if(!el) return;
+    cur=el;
+    const r=el.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width-.5, y=(e.clientY-r.top)/r.height-.5;
+    el.style.transform=`perspective(900px) rotateX(${(-y*9).toFixed(2)}deg) rotateY(${(x*11).toFixed(2)}deg) translateY(-4px)`;
+    el.style.setProperty("--mx",((x+.5)*100).toFixed(1)+"%");
+    el.style.setProperty("--my",((y+.5)*100).toFixed(1)+"%");
+  },{passive:true});
+  document.addEventListener("pointerout",e=>{
+    if(cur && !cur.contains(e.relatedTarget)){ reset(cur); cur=null; }
+  },{passive:true});
+})();
+
+(async function(){ await loadAll(); if(!location.hash) location.hash="#/home"; route(); })();
+</script>
+</body>
+</html>
