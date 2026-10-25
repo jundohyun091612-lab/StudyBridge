@@ -1,0 +1,13 @@
+# Your OpenAI key never goes to GitHub
+OpenAI_Key.txt
+
+# Personal study data and logs stay on this computer
+data/*
+!data/.gitkeep
+logs/
+
+# Generated on each computer
+__pycache__/
+*.pyc
+.deps_installed
+*.lnk
